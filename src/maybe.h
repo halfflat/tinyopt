@@ -17,8 +17,12 @@ struct maybe {
     maybe(nothing_t): ok(false) {}
     maybe(const T& v): ok(true) { construct(v); }
     maybe(T&& v): ok(true) { construct(std::move(v)); }
+    maybe(const maybe& m): ok(m.ok) { if (ok) construct(*m); }
+    maybe(maybe&& m): ok(m.ok) { if (ok) construct(std::move(*m)); }
+
     template <typename U>
     maybe(const maybe<U>& m): ok(m.ok) { if (ok) construct(*m); }
+
     template <typename U>
     maybe(maybe<U>&& m): ok(m.ok) { if (ok) construct(std::move(*m)); }
 
@@ -42,8 +46,8 @@ private:
     void construct(const T& v) { new (data) T(v); ok = true; }
     void construct(T&& v) { new (data) T(std::move(v)); ok = true; }
 
-    void assign(const T& v) { ok? *vptr()=v: construct(v); }
-    void assign(T&& v) { ok? *vptr()=std::move(v): construct(std::move(v)); }
+    void assign(const T& v) { if (ok) *vptr()=v; else construct(v); }
+    void assign(T&& v) { if (ok) *vptr()=std::move(v); else construct(std::move(v)); }
 
     void destroy() { if (ok) (**this).~T(); ok = false; }
 
