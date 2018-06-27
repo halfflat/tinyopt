@@ -1,28 +1,40 @@
 .PHONY: clean all
 .SECONDARY:
 
-topdir:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-srcdir:=$(topdir)src
+top:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-VPATH:=$(srcdir)
+all:: demo unit
 
-all:: demo
+demo-src:=demo.cc
+demo-obj:=$(patsubst %.cc, %.o, $(demo-src))
 
-sources:=demo.cc
-objects:=$(patsubst %.cc,%.o,$(sources))
-depends:=$(patsubst %.cc,%.d,$(sources))
+test-src:=test_adaptor.cc
+test-obj:=$(patsubst %.cc, %.o, $(test-src))
+
+depends:=$(patsubst %.cc, %.d, $(demo-src) $(test-src))
+
+gtest-inc:=$(top)test/googletest/googletest/include
+gtest-src:=$(top)test/googletest/googletest/src/gtest-all.cc
+
+vpath %.cc $(top)test
+vpath %.cc $(top)demo
 
 OPTFLAGS?=-O3 -march=native
 CXXFLAGS+=$(OPTFLAGS) -MMD -MP -std=c++14 -g
-CPPFLAGS+=-I $(srcdir)
+CPPFLAGS+=-isystem ${gtest-inc} -I $(top)include
 
 -include $(depends)
 
-demo: $(objects)
+gtest.o: ${gtest-src}
+
+unit: $(test-obj) gtest.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+demo: $(demo-obj)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 clean:
-	rm -f $(objects)
+	rm -f $(demo-obj) $(test-obj) gtest.o
 
 realclean: clean
-	rm -f demo $(depends)
+	rm -f demo unit $(depends)

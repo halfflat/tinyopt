@@ -52,7 +52,7 @@ namespace adaptor {
         explicit push_back(Sink& sink): sink(sink) {}
 
         template <typename X>
-        push_back_t& operator=(X&& value) {
+        push_back& operator=(X&& value) {
             sink.get().push_back(std::forward<X>(value));
         }
     };
@@ -207,7 +207,21 @@ struct option {
     }
 };
 
-using option_set = std::vector<std::pair<std::string,std::string>>;
+struct option_set {
+    std::vector<std::pair<std::string, std::string>> olist;
+
+    decltype(olist.cbegin()) begin() const { return olist.begin(); }
+    decltype(olist.cend()) end() const { return olist.end(); }
+
+    void add(const std::string& key, const char* value) {
+        olist.emplace_back(key, value? value: "");
+    }
+
+    friend std::ostream& operator<<(std::ostream& out, const option_set& s) {
+        
+    }
+};
+using option_set = std::vector<std::pair<std::string, std::string>>;
 
 template <typename Options>
 option_set run(const Options& options, const option_set& restore = {}) {
