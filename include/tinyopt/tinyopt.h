@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include <iostream>
 #include <iterator>
 #include <sstream>
@@ -9,7 +10,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "maybe.h"
+#include <tinyopt/maybe.h>
 
 namespace to {
 
@@ -83,9 +84,9 @@ public:
             std::istringstream stream(text.substr(p, q-p));
             stream >> v;
             if (!stream) return nothing;
-            else values.push_back(std::move(v));
 
-            p = q+delim_.size();
+            values.push_back(std::move(v));
+            p = q+1;
         }
         return values;
     }
@@ -93,17 +94,17 @@ public:
 
 
 template <typename V>
-constexpr parse = default_parser<V>{};
+constexpr auto parse = default_parser<V>{};
 
 template <typename KeywordPairs>
 auto keywords(const KeywordPairs& pairs) {
     using std::begin;
-    using value_type = std::decay_t<decltype(stdstd::get<0>(*begin(pairs)))>;
-    return keyword_parse<value_type>(pairs);
+    using value_type = std::decay_t<decltype(std::get<0>(*begin(pairs)))>;
+    return keyword_parser<value_type>(pairs);
 }
 
-template <tyepname V, char delim>
-constexpr delimited = delimited_parser<V>(delim);
+template <typename V, char delim>
+constexpr auto delimited = delimited_parser<V>(delim);
 
 
 template <typename V = std::string, typename P = default_parser<V>, typename = std::enable_if_t<!std::is_same<V, void>::value>>
