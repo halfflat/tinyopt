@@ -2,8 +2,10 @@
 
 namespace to {
 
+// Used to label options which take no value.
 constexpr struct flag_tag {} flag;
 
+// Used to label options which should not be captured in returned option_set.
 constexpr struct discard_tag {} discard;
 
 namespace impl {
@@ -103,7 +105,7 @@ auto unset(Sink& sink) { return adaptor::unset<Sink>(sink); }
 template <typename Sink>
 auto count(Sink& sink) { return adaptor::count<Sink>(sink); }
 
-// Parser objects acts as functionals, taking
+// Parser objects act as functionals, taking
 // a const char* argument and returning maybe<T>
 // for some T.
 //
@@ -217,11 +219,106 @@ struct option_set {
         olist.emplace_back(key, value? value: "");
     }
 
+    // Serialized representation:
+    //
+    // Option entries separated by new lines, each option given as key then
+    // value separated by white space (if there is a key) or simply value (if
+    // the key is empty). The keys and values are escaped with single quotes in
+    // a POSIX shell compatabile way, so that they can be used as is from the
+    // shell.
+
     friend std::ostream& operator<<(std::ostream& out, const option_set& s) {
-        
+        auto escape = [](const std::string& v) {
+            if (v.find_first_of("\\*?[#~=%|^;<>()$'`\" \t\n")==std::string::npos) return v;
+
+            // Wrap string in single quotes, replacing any internal single quote
+            // character with: '\''
+
+            std::string q ="'";
+            for (auto c: v) {
+                q += c=='\''? "'\\''": v;
+            }
+            return q;
+        };
+
+        for (auto& p: s.olist) {
+            if (!p.first.empty()) {
+                out << escape(p.first) << ' '
+                    << escape(p.second) << '\n';
+            }
+        }
+        for (auto& p: s.olist) {
+            if (p.first.empty()) {
+                out << escape(p.second) << '\n';
+            }
+        }
+    }
+
+    friend std::istream& operator>>(std::istream& in, option_set& s) {
+        struct parse_state {
+            std::string fields[2];
+            int i = 0; // Index into fields.
+            bool ws = false; // true => in whitespace between fields.
+            bool quote = false; // true => within single quotes.
+            bool escape = false; // true => previous character was backslash.
+
+            // Returns true if parsing of a record is complete, viz. st.quote is false.
+            bool parse_line = (const std::string &line) {
+                for (auto c: line) {
+                    if (st.ws) {
+                        if (c==' ' || c=='\t' || c=='\n') continue;
+                        st.ws = false;
+                        i = 1;
+                    }
+
+                    if (st.quote) {
+                        if (c!='\'') st.fields[i] += c;
+                        else st.quote = false;
+                    }
+                    else {
+                        if (st.escape) {
+                            st.fields[i] += c;
+                            st.escape = false;
+                        }
+                        else if (c=='\\') {
+                            st.escape = truel
+                        }
+                        else if (c=='\\'') {
+                            st.quote = true;
+                        }
+                        else if (c==' ' || c=='\t' || c=='\n') {
+                            st.ws = true;
+                        }
+                        else st.fields[i]+=c;
+                    }
+                }
+                return !st.quote;
+            };
+
+            void push_option(option_set& s) const {
+                // A single field => key is empty, field is value.
+                if (state.i==0) {
+                    s.emplace_back("", std::move(state.fields[0]));
+                }
+                else {
+                    s.emplace_back(std::move(state.fields[0]), std::move(state.fields[1]));
+                }
+            }
+        } state;
+
+        for (std::string line; std::getline(in, line); ) {
+            if (parse_line(state, line)) {
+                state.push_option(s);
+                state = parse_state{};
+            }
+        }
+
+        // If last line has an open quote, parse charitably.
+        if (state.quote) state.push_option(s);
+
+        return in;
     }
 };
-using option_set = std::vector<std::pair<std::string, std::string>>;
 
 template <typename Options>
 option_set run(const Options& options, const option_set& restore = {}) {
@@ -249,7 +346,7 @@ option_set run(const Options& options, int& argc, char** &argv, const option_set
         for (const option& o: options) {
             if (o.keys.empty()) continue;
             if (auto ma = o.match(argc, argv)) {
-                collate.emplace_back(o.preferred_key(), ma.value());
+                if (!o.discard) collate.emplace_back(o.preferred_key(), ma.value());
                 goto next;
             }
         }
@@ -264,7 +361,7 @@ option_set run(const Options& options, int& argc, char** &argv, const option_set
         for (const option& o: options) {
             if (!o.keys.empty()) continue;
             if (auto ma = o.match(argc, argv)) {
-                collate.emplace_back("", ma.value());
+                if (!o.discard) collate.emplace_back("", ma.value());
                 goto next;
             }
         }
