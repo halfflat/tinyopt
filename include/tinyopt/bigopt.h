@@ -1,12 +1,182 @@
 #pragma once
 
+#include <cstring>
+#include <functional>
+#include <utility>
+
+#include <tinyopt/maybe.h>
+#include <tinyopt/parsers.h>
+
 namespace to {
+
+// An option specification comprises zero or more keys (e.g. "-a", "--foo"), a
+// sink (where the parsed argument will be sent), a parser - which may be the
+// default parser - and zero or more flags that modify its behaviour.
+//
+// Option parsers are shared between bigopt and tinyopt, and are described in
+// tinyopt/parsers.h. If no parser is supplied, a default parser will be used
+// based on the value type of the sink.
+
+// Option flags:
 
 // Used to label options which take no value.
 constexpr struct flag_tag {} flag;
 
 // Used to label options which should not be captured in returned option_set.
-constexpr struct discard_tag {} discard;
+constexpr struct ephemeral_tag {} ephemeral;
+
+// Used to label options which should be matched at most once.
+constexpr struct single_tag {} single;
+
+// Used to label options which must be matched at least once.
+constexpr struct mandatory_tag {} mandatory;
+
+// Option sinks:
+//
+// A sink is passed as the first parameter to an option constructor,
+// and is assigned the value of a parsed option parameter.
+//
+// Hmm. For a T& sink, want to store a reference wrapper ref, use
+// ref.get()=value, and have the default parser be the one for T.
+//
+// For 
+
+namespace sink {
+    template <typename Container>
+    struct push_back {
+        using value_type = typename Container::value_type;
+
+        std::reference_wrapper<Container> c_;
+        explicit push_back(Container& c): c_(c) {}
+
+        template <typename T>
+        void operator()(T&& value) const {
+            c_.get().push_back(std::forward<T>(value));
+        }
+    };
+
+    template <typename X, typename V>
+    struct set_value {
+        using value_type = std::string; // parsed argument is ignored
+
+        std::reference_wrapper<X> ref;
+        const V value;
+
+        explicit set(X& x, V v): ref(x), value(std::move(v)) {}
+
+        template <typename T>
+        void operator()(T&& value) const {
+            ref.get() = v;
+        }
+    };
+
+    template <typename X>
+    struct increment {
+        using value_type = std::string; // parsed argument is ignored
+
+        std::reference_wrapper<X> ref;
+        explicit count(X& x): ref(x) {}
+
+        template <typename T>
+        void operator()(T&& value) const {
+            ++ref.get();
+        }
+    }
+
+    template <typename X>
+    struct assign {
+        using value_type = X;
+
+        std::reference_wrapper<X> ref;
+        explicit assign(X& x): ref(x) {}
+
+        template <typename T>
+        void operator()(T&& value) const {
+            ref.get() = std::forward<T>(value);
+        }
+    }
+}
+
+template <typename Container>
+sink::push_back<Container> push_back(Container& c) {
+    return sink::push_back<Container>(c);
+}
+
+template <typename X, V>
+sink::set<X, V> set(X& x, V value) {
+    return sink::set<X, V>(x, std::move(value));
+}
+
+template <typename X>
+sink::set<X, bool> set(X& x) {
+    return sink::set<X, bool>(x, true);
+}
+
+template <typename X>
+sink::increment<X> increment(X& x) {
+    return sink::increment<X>(x);
+}
+template <typename X>
+sink::assign<X> assign(X& x) {
+    return sink::assign<X>(x);
+}
+
+// Option keys:
+//
+// A key is how the option is specified in an argument list,
+// and is typically represented as a 'short' (e.g. '-a')
+// option or a 'long' option (e.g. '--apple').
+//
+// The value for an option can always be taken from the
+// next argument in the list, but in addition can be specified
+// together with the key itself, depending on the properties
+// of the option key:
+//
+//     --key=value         'Long' style argument for key "--key"
+//     -kvalue             'Compact' style argument for key "-k"
+//
+// Compact option keys can be combined in the one item in
+// the argument list, if the options do not take any values
+// (that is, they are glags). For example, if -a, -b are flags
+// and -c takes an integer argument, with all three keys marked
+// as compact, then an item '-abc3' in the argument list
+// will be parsed in the same way as the sequence of items
+// '-a', '-b', '-c', '3'.
+//
+// An option without a key will match any item in the argument
+// list; options with keys are always checked first.
+
+struct key {
+    std::string label;
+    enum style { short, long, compact } style = short;
+
+    key(std::string label): label(std::move(label)) {
+        if (label[0]=='-' && label[1]=='-') style = long;
+    }
+
+    key(std::string label, enum style style):
+        label(std::move(label)), style(style) {}
+};
+
+inline nameslace literals {
+
+inline key operator""_short(const char* label) {
+    return key(label, key::short);
+}
+
+inline key operator""_long(const char* label) {
+    return key(label, key::long);
+}
+
+inline key operator""_compact(const char* label) {
+    return key(label, key::compact);
+}
+
+}
+
+// Option class:
+//
+
 
 namespace impl {
     inline void shift(int& argc, char** argv, unsigned n = 1) {
@@ -45,88 +215,68 @@ namespace impl {
     }
 }
 
-// Argument adaptors:
-
-namespace adaptor {
-    template <typename Sink>
-    struct push_back {
-        std::reference_wrapper<Sink> sink;
-        explicit push_back(Sink& sink): sink(sink) {}
-
-        template <typename X>
-        push_back& operator=(X&& value) {
-            sink.get().push_back(std::forward<X>(value));
-        }
-    };
-
-    template <typename Sink>
-    struct set {
-        std::reference_wrapper<Sink> sink;
-        explicit set(Sink& sink): sink(sink) {}
-
-        template <typename X>
-        set& operator=(X&& value) {
-            sink.get() = true;
-        }
-    };
-
-    template <typename Sink>
-    struct unset {
-        std::reference_wrapper<Sink> sink;
-        explicit set(Sink& sink): sink(sink) {}
-
-        template <typename X>
-        set& operator=(X&& value) {
-            sink.get() = false;
-        }
-    };
-
-    template <typename Sink>
-    struct count {
-        std::reference_wrapper<Sink> sink;
-        explicit count(Sink& sink): sink(sink) {}
-
-        template <typename X>
-        count& operator=(X&& value) {
-            ++count.get();
-        }
-    }
-}
-
-template <typename Sink>
-auto push_back(Sink& sink) { return adaptor::push_back<Sink>(sink); }
-
-template <typename Sink>
-auto set(Sink& sink) { return adaptor::set<Sink>(sink); }
-
-template <typename Sink>
-auto unset(Sink& sink) { return adaptor::unset<Sink>(sink); }
-
-template <typename Sink>
-auto count(Sink& sink) { return adaptor::count<Sink>(sink); }
-
-// Parser objects act as functionals, taking
-// a const char* argument and returning maybe<T>
-// for some T.
+// Sink adaptors:
 //
-// A Parser of type to::flag_tag is treated specially
-// as indicating the option takes no argument.
+// Sinks are given as the first argument to an option constructor.
+// If they are lvalue references, they are assigned the parsed value
+// of the option. Sink adaptors generalize this behaviour.
+//
+// TODO: describe requirements (basically operator= and value_type).
+
+
+// Option specification.
+// Constructed with option(sink, [parser,] [flag | option-key, ...]).
+//
+// In argument processing, options with keys are tested first,
+// followed by options without keys, which will match any argument.
+//
+// Option behaviour can be customized by providing a custom parser
+// for the value, a sink adaptor for accepting the value, and by
+// the following flags:
+//
+//     to::discard         Do not record this option value in the saved option set.
+//     to::flag            Option takes no argument (sink is assigned with value 'true').
+//     to::single          Option will be matched at most once in the argument list.
+//
+// Options are tested in the order they are supplied to to::run.
+//
+// The value of an option can be taken from the next argument in the argument list,
+// provided with an '=' in the same argument. For example, for an option with keys "-f" and "--foo"
+// will match any of:
+//
+//     -f value
+//     -f=value
+//     --foo value
+//     --foo=value
+//
+// There is currently no support for combining flags into a single argument.
 
 struct option {
     std::function<bool (const char*)> setter;
     std::vector<std::string> keys;
     std::string prefkey;
     bool is_flag = false;
+    bool is_single = false;
     bool discard = false;
+    bool mandatory = false;
 
-    template <typename Sink>
-    option(Sink& sink, Rest&&... rest):
-        option(std::ref(sink), std::forward<Rest>(rest)...)
-    {}
+    // If no parser is given, pick defautl parser based on value
+    // of sink reference, or value_type of sink adaptor.
 
-    template <typename Sink, typename Parse, typename... Keys>
-    option(Sink sink, Parse p, Keys... keys) {
-        accumulate_keys(keys...);
+
+
+    template <typename Sink, typename... Rest>
+    option(Sink sink, Rest&&... rest) {
+
+        setter = [sink = std::move(sink)](auto&& value) {
+            sink = value;
+        };
+
+        parser = [&setter](const char* t) -> bool {
+            auto 
+        };
+
+
         setter = [sink = std::move(sink), p = std::move(p)](const char* arg) -> bool {
             return sink << p(arg);
         }

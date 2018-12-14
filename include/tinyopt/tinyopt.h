@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <tinyopt/maybe.h>
+#include <tinyopt/parsers.h>
 
 namespace to {
 
@@ -34,78 +35,6 @@ void usage(const char* argv0, const std::string& usage_str, const std::string& p
     std::cerr << basename << ": " << parse_err << "\n";
     std::cerr << "Usage: " << basename << " " << usage_str << "\n";
 }
-
-template <typename V>
-struct default_parser {
-    maybe<V> operator()(const std::string& text) const {
-        V v;
-        std::istringstream stream(text);
-        stream >> v;
-        return stream? maybe<V>(v): nothing;
-    }
-};
-
-template <typename V>
-class keyword_parser {
-    std::vector<std::pair<std::string, V>> map_;
-
-public:
-    template <typename KeywordPairs>
-    keyword_parser(const KeywordPairs& pairs) {
-        using std::begin;
-        using std::end;
-        map_.assign(begin(pairs), end(pairs));
-    }
-
-    maybe<V> operator()(const std::string& text) const {
-        for (const auto& p: map_) {
-            if (text==p.first) return p.second;
-        }
-        return nothing;
-    }
-};
-
-template <typename V>
-class delimited_parser {
-    char delim_;
-
-public:
-    explicit constexpr delimited_parser(char delim): delim_(delim) {}
-
-    maybe<std::vector<V>> operator()(const std::string& text) const {
-        std::vector<V> values;
-        std::size_t p = 0, n = text.size();
-
-        while (p<n) {
-            std::size_t q = text.find(delim_, p);
-            if (q==std::string::npos) q = n;
-
-            V v;
-            std::istringstream stream(text.substr(p, q-p));
-            stream >> v;
-            if (!stream) return nothing;
-
-            values.push_back(std::move(v));
-            p = q+1;
-        }
-        return values;
-    }
-};
-
-
-template <typename V>
-constexpr auto parse = default_parser<V>{};
-
-template <typename KeywordPairs>
-auto keywords(const KeywordPairs& pairs) {
-    using std::begin;
-    using value_type = std::decay_t<decltype(std::get<0>(*begin(pairs)))>;
-    return keyword_parser<value_type>(pairs);
-}
-
-template <typename V, char delim>
-constexpr auto delimited = delimited_parser<V>(delim);
-
 
 template <typename V = std::string, typename P = default_parser<V>, typename = std::enable_if_t<!std::is_same<V, void>::value>>
 maybe<V> parse_opt(char **& argp, char shortopt, const char* longopt=nullptr, const P& parse = P{}) {
