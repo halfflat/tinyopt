@@ -33,18 +33,27 @@ constexpr struct mandatory_tag {} mandatory;
 
 // Option sinks:
 //
-// A sink is passed as the first parameter to an option constructor,
-// and is assigned the value of a parsed option parameter.
+// A sink is associated with every option. It can be any object
+// of a type `S` which provides a type `S::argument_type` and
+// an `operator()` that can take a single argument of this type.
+// If `S::argument_type` is void, any parameter for the option
+// is not parsed, and `operator()` is called without an argument.
 //
-// Hmm. For a T& sink, want to store a reference wrapper ref, use
-// ref.get()=value, and have the default parser be the one for T.
+// A function `sink` is provided that will automatically wrap
+// functions and funtional objects with an unambiguous overload
+// set for `operator()`.
 //
-// For 
+// Adaptors are provided for assigning to a value, appending to
+// a vector, incrementing a count, or setting a constant value.
+//
+// Sinks are provided as the first argument to the `option`
+// constructor. Any lvalue reference that does not match the sink
+// conditions is automatically wrapped in the assign sink adaptor.
 
-namespace sink {
+namespace impl {
     template <typename Container>
     struct push_back {
-        using value_type = typename Container::value_type;
+        using argument_type = typename Container::value_type;
 
         std::reference_wrapper<Container> c_;
         explicit push_back(Container& c): c_(c) {}
@@ -57,35 +66,28 @@ namespace sink {
 
     template <typename X, typename V>
     struct set_value {
-        using value_type = std::string; // parsed argument is ignored
+        using argument_type = void;
 
         std::reference_wrapper<X> ref;
         const V value;
 
         explicit set(X& x, V v): ref(x), value(std::move(v)) {}
-
-        template <typename T>
-        void operator()(T&& value) const {
-            ref.get() = v;
-        }
+        void operator()() const { ref.get() = v; }
     };
 
     template <typename X>
     struct increment {
-        using value_type = std::string; // parsed argument is ignored
+        using argument_type = void;
 
         std::reference_wrapper<X> ref;
-        explicit count(X& x): ref(x) {}
 
-        template <typename T>
-        void operator()(T&& value) const {
-            ++ref.get();
-        }
+        explicit count(X& x): ref(x) {}
+        void operator()() const { ++ref.get(); }
     }
 
     template <typename X>
     struct assign {
-        using value_type = X;
+        using argument_type = X;
 
         std::reference_wrapper<X> ref;
         explicit assign(X& x): ref(x) {}
@@ -95,30 +97,45 @@ namespace sink {
             ref.get() = std::forward<T>(value);
         }
     }
+
+    template <typename S, typename A>
+    using check_sink_sig =
+        std::integral_constant<bo std::check_sing_sig_void<S, A>
+
+    template <typename S>
+    struct is_sink:
+        std::integral_constant<bool,
+            check_sink_sig_void<S>::value || check_sing
+
+
+
+    
+
 }
 
 template <typename Container>
-sink::push_back<Container> push_back(Container& c) {
-    return sink::push_back<Container>(c);
+impl::push_back<Container> push_back(Container& c) {
+    return impl::push_back<Container>(c);
 }
 
 template <typename X, V>
-sink::set<X, V> set(X& x, V value) {
-    return sink::set<X, V>(x, std::move(value));
+impl::set<X, V> set(X& x, V value) {
+    return impl::set<X, V>(x, std::move(value));
 }
 
 template <typename X>
-sink::set<X, bool> set(X& x) {
-    return sink::set<X, bool>(x, true);
+impl::set<X, bool> set(X& x) {
+    return impl::set<X, bool>(x, true);
 }
 
 template <typename X>
-sink::increment<X> increment(X& x) {
-    return sink::increment<X>(x);
+impl::increment<X> increment(X& x) {
+    return impl::increment<X>(x);
 }
+
 template <typename X>
-sink::assign<X> assign(X& x) {
-    return sink::assign<X>(x);
+impl::assign<X> assign(X& x) {
+    return impl::assign<X>(x);
 }
 
 // Option keys:
