@@ -31,16 +31,8 @@ constexpr struct single_tag {} single;
 // Used to label options which must be matched at least once.
 constexpr struct mandatory_tag {} mandatory;
 
-// Option sinks:
-//
-// A sink is passed as the first parameter to an option constructor,
-// and is assigned the value of a parsed option parameter.
-//
-// Hmm. For a T& sink, want to store a reference wrapper ref, use
-// ref.get()=value, and have the default parser be the one for T.
-//
-// For 
 
+#if 0
 namespace sink {
     template <typename Container>
     struct push_back {
@@ -57,7 +49,7 @@ namespace sink {
 
     template <typename X, typename V>
     struct set_value {
-        using value_type = std::string; // parsed argument is ignored
+        using value_type = void;
 
         std::reference_wrapper<X> ref;
         const V value;
@@ -72,12 +64,9 @@ namespace sink {
 
     template <typename X>
     struct increment {
-        using value_type = std::string; // parsed argument is ignored
-
         std::reference_wrapper<X> ref;
         explicit count(X& x): ref(x) {}
 
-        template <typename T>
         void operator()(T&& value) const {
             ++ref.get();
         }
@@ -120,6 +109,54 @@ template <typename X>
 sink::assign<X> assign(X& x) {
     return sink::assign<X>(x);
 }
+
+#endif
+
+/* Sinks wrap a function that takes a pointer to
+ * an option parameter and stores or acts upon the
+ * parsed result.
+ *
+ * They can be constructed from an lvalue reference
+ * or a functional object (via the `action` function)
+ * with or without an explicit parser function. If
+ * no parser is given, a default one is used if the
+ * correct value type can be determined.
+ */
+
+struct sink {
+    // Tag class for constructor.
+    static struct action_t {} action;
+
+    template <typename F, typename P>
+    friend sink action(F f, P parser) {
+        return sink(sink::action,
+            [f = std::move(f), parser = std::move(parser)](const char* param) {
+                if (auto p = parser(param)) return f(std::move(p)), true;
+                else return false;
+            });
+    }
+
+    template <typename F, typename A = unary_argument_type_t<F>>
+    friend sink action(F f) {
+        return action(std::move(f), default_parser<A>);
+    }
+
+    template <typename V>
+    sink(V&): sink(var, default_parser<V>) {}
+
+    template <typename V, typename P>
+    sink(V& var, P parser):
+        sink(action, [ref=std::ref(var), parser](const char* param) {
+                if (auto p = parser(param)) return ref.get() = std::move(p), true;
+                else return false;
+            })
+    {}
+
+    template <typename Action>
+    sink(action_t, Action a): op(std::move(a)) {}
+
+    std::function(bool (const char*)) op;
+};
 
 // Option keys:
 //
