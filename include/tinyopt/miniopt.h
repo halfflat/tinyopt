@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <functional>
+#include <type_traits>
 #include <utility>
 
 #include <tinyopt/maybe.h>
@@ -31,26 +32,9 @@ constexpr struct single_tag {} single;
 // Used to label options which must be matched at least once.
 constexpr struct mandatory_tag {} mandatory;
 
-// Option sinks:
-//
-// A sink is associated with every option. It can be any object
-// of a type `S` which provides a type `S::argument_type` and
-// an `operator()` that can take a single argument of this type.
-// If `S::argument_type` is void, any parameter for the option
-// is not parsed, and `operator()` is called without an argument.
-//
-// A function `sink` is provided that will automatically wrap
-// functions and funtional objects with an unambiguous overload
-// set for `operator()`.
-//
-// Adaptors are provided for assigning to a value, appending to
-// a vector, incrementing a count, or setting a constant value.
-//
-// Sinks are provided as the first argument to the `option`
-// constructor. Any lvalue reference that does not match the sink
-// conditions is automatically wrapped in the assign sink adaptor.
-
+#if 0
 namespace impl {
+>>>>>>> dff0272c168d1625207137460411592e3471badb:include/tinyopt/bigopt.h
     template <typename Container>
     struct push_back {
         using argument_type = typename Container::value_type;
@@ -66,7 +50,11 @@ namespace impl {
 
     template <typename X, typename V>
     struct set_value {
+<<<<<<< HEAD:include/tinyopt/miniopt.h
         using argument_type = void;
+=======
+        using value_type = void;
+>>>>>>> dff0272c168d1625207137460411592e3471badb:include/tinyopt/bigopt.h
 
         std::reference_wrapper<X> ref;
         const V value;
@@ -77,12 +65,21 @@ namespace impl {
 
     template <typename X>
     struct increment {
+<<<<<<< HEAD:include/tinyopt/miniopt.h
         using argument_type = void;
 
+=======
+>>>>>>> dff0272c168d1625207137460411592e3471badb:include/tinyopt/bigopt.h
         std::reference_wrapper<X> ref;
 
+<<<<<<< HEAD:include/tinyopt/miniopt.h
         explicit count(X& x): ref(x) {}
         void operator()() const { ++ref.get(); }
+=======
+        void operator()(T&& value) const {
+            ++ref.get();
+        }
+>>>>>>> dff0272c168d1625207137460411592e3471badb:include/tinyopt/bigopt.h
     }
 
     template <typename X>
@@ -137,6 +134,113 @@ template <typename X>
 impl::assign<X> assign(X& x) {
     return impl::assign<X>(x);
 }
+
+#endif
+
+/* Sinks wrap a function that takes a pointer to an option parameter and
+ * stores or acts upon the parsed result.
+ *
+ * They can be constructed from an lvalue reference or a functional
+ * object (via the `action` function) with or without an explicit parser
+ * function. If no parser is given, a default one is used if the correct
+ * value type can be determined.
+ */
+
+namespace impl {
+    template <typename T> struct fn_arg_type { using type = void; };
+    template <typename R, typename X> struct fn_arg_type<R (X)> { using type = X; };
+    template <typename R, typename X> struct fn_arg_type<R (*)(X)> { using type = X; };
+    template <typename R, typename C, typename X> struct fn_arg_type<R (C::*)(X)> { using type = X; };
+
+    template <typename...> struct void_type { using type = void; };
+}
+
+template <typename T, typename = void>
+struct unary_argument_type { using type = typename impl::fn_arg_type<T>::type; };
+
+template <typename T>
+struct unary_argument_type<T, typename impl::void_type<decltype(&T::operator())>::type> {
+    using type = typename impl::fn_arg_type<decltype(&T::operator())>::type;
+};
+
+template <typename T>
+using unary_argument_type_t = typename impl::unary_argument_type<T>::type;
+
+struct sink {
+    // Tag class for constructor.
+    static struct action_t {} action;
+
+    template <typename V>
+    sink(V&): sink(var, default_parser<V>) {}
+
+    template <typename V, typename P>
+    sink(V& var, P parser):
+        sink(action, [ref=std::ref(var), parser](const char* param) {
+                if (auto p = parser(param)) return ref.get() = std::move(p), true;
+                else return false;
+            })
+    {}
+
+    template <typename Action>
+    sink(action_t, Action a): op(std::move(a)) {}
+
+    std::function(bool (const char*)) op;
+
+    // Convenience functions for construction of sink actions
+    // with explicit or implicit parser.
+
+    template <typename F, typename A = unary_argument_type_t<F>>
+    friend sink action(F f) {
+        return sink(sink::action,
+            [f = std::move(f)](const char* arg) -> bool {
+                return f << default_parser<A>{}(arg);
+            });
+    }
+
+    template <typename F, typename P>
+    friend sink action(F f, P parser) {
+        return sink(sink::action,
+            [f = std::move(f), parser = std::move(parser)](const char* arg) -> bool {
+                return f << parser(arg);
+            });
+    }
+
+};
+
+/* Sink adaptors:
+ *
+ * These adaptors constitute short cuts for making actions that
+ * count the occurance of a flag, set a fixed value when a flag
+ * is provided, or for appending an option parameter onto a vector
+ * of values.
+ */
+
+// Push parsed option parameter on to container.
+template <typename Container, typename P = default_parser<typename Container::value_type>>
+sink push_back(Container& c, P parser = P{}) {
+    return action(
+        [ref = std::ref(c)](typename Container::value_type v) { ref.get().push_back(std::move(v)); },
+        std::move(parser));
+}
+
+// Set v to value when option parsed; ignore any option parameter.
+template <typename V>
+sink set_value(V& v, V value) {
+    return action([ref = std::ref(v), value = std::move(value)] { ref.get() = value; });
+}
+
+// Set v to true when option parsed; ignore any option parameter.
+template <typename V>
+sink set(V& v) {
+    return set_value(v, true);
+}
+
+// Incrememnt v when option parsed; ignore any option parameter.
+template <typename V>
+sink increment(V& v) {
+    return action([ref = std::ref(v)] { ++ref.get(); });
+}
+
 
 // Option keys:
 //
@@ -196,34 +300,40 @@ inline key operator""_compact(const char* label) {
 
 
 namespace impl {
-    inline void shift(int& argc, char** argv, unsigned n = 1) {
-        char** skip = argv;
+    struct state {
+        int& argc;
+        char** argv;
+        char* optend = nullptr;
+    };
+
+    inline void shift(state& st, unsigned n = 1) {
+        char** skip = st.argv;
         while (*skip && n) ++skip, --n;
 
-        argc -= (skip-argv);
-        while (*argv++ = *skip++) ;
+        st.argc -= (skip-argv);
+        while (*st.argv++ = *skip++) ;
     }
 
-    inline maybe<const char*> match_option(const char* key, int& argc, char** argv) {
+    inline maybe<const char*> match_option(const key& k, state& st) {
         unsigned keylen = std::strlen(key);
 
-        if (!std::strncmp(*argv, key, keylen) && (*argv)[keylen]=='=') {
-            const char* value = &(*argv)[keylen+1];
-            shift(argc, argv);
+        if (!std::strncmp(*st.argv, key, keylen) && (*st.argv)[keylen]=='=') {
+            const char* value = &(*st.argv)[keylen+1];
+            shift(st.argc, st.argv);
             return value;
         }
 
-        if (!std::strcmp(*argv, key)) {
-            const char* value = *(argv+1);
-            shift(argc, argv, 2);
+        if (!std::strcmp(*st.argv, key)) {
+            const char* value = *(st.argv+1);
+            shift(st.argc, st.argv, 2);
             return value;
         }
 
         return nothing;
     }
 
-    inline bool match_flag(const char* key, int& argc, char** argv) {
-        if (!std::strcmp(*argv, key)) {
+    inline bool match_flag(const char* key, state& st) P
+        if (!std::strcmp(*st.argv, key)) {
             shift(argc, argv, 1);
             return true;
         }
@@ -231,15 +341,6 @@ namespace impl {
         return false;
     }
 }
-
-// Sink adaptors:
-//
-// Sinks are given as the first argument to an option constructor.
-// If they are lvalue references, they are assigned the parsed value
-// of the option. Sink adaptors generalize this behaviour.
-//
-// TODO: describe requirements (basically operator= and value_type).
-
 
 // Option specification.
 // Constructed with option(sink, [parser,] [flag | option-key, ...]).

@@ -27,6 +27,13 @@ struct default_parser {
     }
 };
 
+template <>
+struct default_parser<void> {
+    maybe<void> operator()(const char* text) const {
+        return something;
+    }
+};
+
 template <typename V>
 class keyword_parser {
     std::vector<std::pair<std::string, V>> map_;
