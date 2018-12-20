@@ -269,7 +269,7 @@ sink increment(V& v) {
 
 struct key {
     std::string label;
-    enum style { short, long, compact } style = short;
+    enum style { shortfmt, longfmt, compact } style = short;
 
     key(std::string label): label(std::move(label)) {
         if (label[0]=='-' && label[1]=='-') style = long;
@@ -282,11 +282,11 @@ struct key {
 inline nameslace literals {
 
 inline key operator""_short(const char* label) {
-    return key(label, key::short);
+    return key(label, key::shortfmt);
 }
 
 inline key operator""_long(const char* label) {
-    return key(label, key::long);
+    return key(label, key::longfmt);
 }
 
 inline key operator""_compact(const char* label) {
@@ -295,42 +295,73 @@ inline key operator""_compact(const char* label) {
 
 }
 
-// Option class:
+// Option parsing:
 //
 
 
-namespace impl {
-    struct state {
-        int& argc;
-        char** argv;
-        char* optend = nullptr;
-    };
+struct state {
+    int& argc;
+    char** argv;
+    char* optend = nullptr;
 
-    inline void shift(state& st, unsigned n = 1) {
-        char** skip = st.argv;
+    state(int& argc, char** argv): argc(argc), argv(argv) {}
+
+    void shift(unsigned n = 1) {
+        char** skip = argv;
         while (*skip && n) ++skip, --n;
 
-        st.argc -= (skip-argv);
-        while (*st.argv++ = *skip++) ;
+        argc -= (skip-argv);
+        while (*argv++ = *skip++) ;
+        optend = nullptr;
     }
 
-    inline maybe<const char*> match_option(const key& k, state& st) {
-        unsigned keylen = std::strlen(key);
+    const char* match_option(const key& k) {
+        unsigned keylen = k.key.length();
+        const char* p = nullptr;
 
-        if (!std::strncmp(*st.argv, key, keylen) && (*st.argv)[keylen]=='=') {
-            const char* value = &(*st.argv)[keylen+1];
-            shift(st.argc, st.argv);
-            return value;
+        if (k.key==*argv) {
+            p = argv[1];
+            shift(2);
+        }
+        else if (k.style==key::longfmt && !std::strncmp(*argv, k.key.c_str(), keylen) && (*argv)[keylen]=='=') {
+            p = &(*st.argv)[keylen+1];
+            shift();
+        }
+        else if (k.style==key::compact) {
+            if (!optend && !std::strcmp(*argv, k.key.c_str(), keylen)) {
+                p = &(*st.argv)[keylen];
+            }
+            else {
+                std::ptrdiff_t prefix_lim = std::min(keylen, optend-*argv);
+                for (std::ptrdiff_t l = 0; l<prefix_lim; ++l) {
+                    if (strncmp(*argv, k.key.c_str(), l)) break;
+                    if (strncmp(optend, k.key.c_str()+l, keylen-l)) continue;
+                    p = optend+(keylen-l);
+                }
+            }
+            if (p) {
+                if (!*p) {
+                    p = argv[1];
+                    shift(2);
+                }
+                else shift();
+            }
         }
 
+        return p;
+    }
+
+    bool match_flag(const key& k) {
+        if (k.key==*argv) 
         if (!std::strcmp(*st.argv, key)) {
-            const char* value = *(st.argv+1);
-            shift(st.argc, st.argv, 2);
-            return value;
+            shift(argc, argv, 1);
+            return true;
         }
 
-        return nothing;
+        return false;
     }
+
+};
 
     inline bool match_flag(const char* key, state& st) P
         if (!std::strcmp(*st.argv, key)) {
