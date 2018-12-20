@@ -69,7 +69,7 @@ struct sink {
     template <typename V, typename P>
     sink(V& var, P parser):
         sink(action, [ref=std::ref(var), parser](const char* param) {
-                if (auto p = parser(param)) return ref.get() = std::move(p), true;
+                if (auto p = parser(param)) return ref.get() = std::move(*p), true;
                 else return false;
             })
     {}
