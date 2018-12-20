@@ -1,4 +1,4 @@
-#include <tinyopt/tinyopt.h>
+#include <tinyopt/miniopt.h>
 
 // Do we even compile?
 

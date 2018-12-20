@@ -1,14 +1,17 @@
 #pragma once
 
+#include <cstddef>
 #include <cstring>
 #include <functional>
 #include <type_traits>
 #include <utility>
 
 #include <tinyopt/maybe.h>
-#include <tinyopt/parsers.h>
+#include <tinyopt/common.h>
 
 namespace to {
+
+// TODO: Arrange: state; sinks; keys; options; runner.
 
 // An option specification comprises zero or more keys (e.g. "-a", "--foo"), a
 // sink (where the parsed argument will be sent), a parser - which may be the
@@ -20,122 +23,12 @@ namespace to {
 
 // Option flags:
 
-// Used to label options which take no value.
-constexpr struct flag_tag {} flag;
-
-// Used to label options which should not be captured in returned option_set.
-constexpr struct ephemeral_tag {} ephemeral;
-
-// Used to label options which should be matched at most once.
-constexpr struct single_tag {} single;
-
-// Used to label options which must be matched at least once.
-constexpr struct mandatory_tag {} mandatory;
-
-#if 0
-namespace impl {
->>>>>>> dff0272c168d1625207137460411592e3471badb:include/tinyopt/bigopt.h
-    template <typename Container>
-    struct push_back {
-        using argument_type = typename Container::value_type;
-
-        std::reference_wrapper<Container> c_;
-        explicit push_back(Container& c): c_(c) {}
-
-        template <typename T>
-        void operator()(T&& value) const {
-            c_.get().push_back(std::forward<T>(value));
-        }
-    };
-
-    template <typename X, typename V>
-    struct set_value {
-<<<<<<< HEAD:include/tinyopt/miniopt.h
-        using argument_type = void;
-=======
-        using value_type = void;
->>>>>>> dff0272c168d1625207137460411592e3471badb:include/tinyopt/bigopt.h
-
-        std::reference_wrapper<X> ref;
-        const V value;
-
-        explicit set(X& x, V v): ref(x), value(std::move(v)) {}
-        void operator()() const { ref.get() = v; }
-    };
-
-    template <typename X>
-    struct increment {
-<<<<<<< HEAD:include/tinyopt/miniopt.h
-        using argument_type = void;
-
-=======
->>>>>>> dff0272c168d1625207137460411592e3471badb:include/tinyopt/bigopt.h
-        std::reference_wrapper<X> ref;
-
-<<<<<<< HEAD:include/tinyopt/miniopt.h
-        explicit count(X& x): ref(x) {}
-        void operator()() const { ++ref.get(); }
-=======
-        void operator()(T&& value) const {
-            ++ref.get();
-        }
->>>>>>> dff0272c168d1625207137460411592e3471badb:include/tinyopt/bigopt.h
-    }
-
-    template <typename X>
-    struct assign {
-        using argument_type = X;
-
-        std::reference_wrapper<X> ref;
-        explicit assign(X& x): ref(x) {}
-
-        template <typename T>
-        void operator()(T&& value) const {
-            ref.get() = std::forward<T>(value);
-        }
-    }
-
-    template <typename S, typename A>
-    using check_sink_sig =
-        std::integral_constant<bo std::check_sing_sig_void<S, A>
-
-    template <typename S>
-    struct is_sink:
-        std::integral_constant<bool,
-            check_sink_sig_void<S>::value || check_sing
-
-
-
-    
-
-}
-
-template <typename Container>
-impl::push_back<Container> push_back(Container& c) {
-    return impl::push_back<Container>(c);
-}
-
-template <typename X, V>
-impl::set<X, V> set(X& x, V value) {
-    return impl::set<X, V>(x, std::move(value));
-}
-
-template <typename X>
-impl::set<X, bool> set(X& x) {
-    return impl::set<X, bool>(x, true);
-}
-
-template <typename X>
-impl::increment<X> increment(X& x) {
-    return impl::increment<X>(x);
-}
-
-template <typename X>
-impl::assign<X> assign(X& x) {
-    return impl::assign<X>(x);
-}
-
-#endif
+enum option_flag {
+    flag = 1,       // Option takes no parameter.
+    ephemeral = 2,  // Option is not saved in returned results.
+    single = 4,     // Option is parsed at most once.
+    mandatory = 8   // Option must be present in argument list.
+};
 
 /* Sinks wrap a function that takes a pointer to an option parameter and
  * stores or acts upon the parsed result.
@@ -164,14 +57,14 @@ struct unary_argument_type<T, typename impl::void_type<decltype(&T::operator())>
 };
 
 template <typename T>
-using unary_argument_type_t = typename impl::unary_argument_type<T>::type;
+using unary_argument_type_t = typename unary_argument_type<T>::type;
 
 struct sink {
     // Tag class for constructor.
     static struct action_t {} action;
 
     template <typename V>
-    sink(V&): sink(var, default_parser<V>) {}
+    sink(V& var): sink(var, default_parser<V>{}) {}
 
     template <typename V, typename P>
     sink(V& var, P parser):
@@ -184,7 +77,8 @@ struct sink {
     template <typename Action>
     sink(action_t, Action a): op(std::move(a)) {}
 
-    std::function(bool (const char*)) op;
+    bool operator()(const char* param) const { return op(param); }
+    std::function<bool (const char*)> op;
 
     // Convenience functions for construction of sink actions
     // with explicit or implicit parser.
@@ -204,7 +98,6 @@ struct sink {
                 return f << parser(arg);
             });
     }
-
 };
 
 /* Sink adaptors:
@@ -269,17 +162,17 @@ sink increment(V& v) {
 
 struct key {
     std::string label;
-    enum style { shortfmt, longfmt, compact } style = short;
+    enum style { shortfmt, longfmt, compact } style = shortfmt;
 
     key(std::string label): label(std::move(label)) {
-        if (label[0]=='-' && label[1]=='-') style = long;
+        if (label[0]=='-' && label[1]=='-') style = longfmt;
     }
 
     key(std::string label, enum style style):
         label(std::move(label)), style(style) {}
 };
 
-inline nameslace literals {
+inline namespace literals {
 
 inline key operator""_short(const char* label) {
     return key(label, key::shortfmt);
@@ -293,7 +186,7 @@ inline key operator""_compact(const char* label) {
     return key(label, key::compact);
 }
 
-}
+} // namespace literals
 
 // Option parsing:
 //
@@ -302,7 +195,7 @@ inline key operator""_compact(const char* label) {
 struct state {
     int& argc;
     char** argv;
-    char* optend = nullptr;
+    unsigned optoff = 0;
 
     state(int& argc, char** argv): argc(argc), argv(argv) {}
 
@@ -312,34 +205,29 @@ struct state {
 
         argc -= (skip-argv);
         while (*argv++ = *skip++) ;
-        optend = nullptr;
+        optoff = 0;
+    }
+
+    void skip() {
+         if (*argv) ++argv;
     }
 
     const char* match_option(const key& k) {
-        unsigned keylen = k.key.length();
         const char* p = nullptr;
 
-        if (k.key==*argv) {
+        if (k.label==*argv) {
             p = argv[1];
             shift(2);
         }
-        else if (k.style==key::longfmt && !std::strncmp(*argv, k.key.c_str(), keylen) && (*argv)[keylen]=='=') {
-            p = &(*st.argv)[keylen+1];
-            shift();
+        else if (k.style==key::longfmt) {
+            auto keylen = k.label.length();
+            if (!std::strncmp(*argv, k.label.c_str(), keylen) && (*argv)[keylen]=='=') {
+                p = &(*argv)[keylen+1];
+                shift();
+            }
         }
         else if (k.style==key::compact) {
-            if (!optend && !std::strcmp(*argv, k.key.c_str(), keylen)) {
-                p = &(*st.argv)[keylen];
-            }
-            else {
-                std::ptrdiff_t prefix_lim = std::min(keylen, optend-*argv);
-                for (std::ptrdiff_t l = 0; l<prefix_lim; ++l) {
-                    if (strncmp(*argv, k.key.c_str(), l)) break;
-                    if (strncmp(optend, k.key.c_str()+l, keylen-l)) continue;
-                    p = optend+(keylen-l);
-                }
-            }
-            if (p) {
+            if (p = match_compact_key(k.label.c_str())) {
                 if (!*p) {
                     p = argv[1];
                     shift(2);
@@ -352,26 +240,36 @@ struct state {
     }
 
     bool match_flag(const key& k) {
-        if (k.key==*argv) 
-        if (!std::strcmp(*st.argv, key)) {
-            shift(argc, argv, 1);
+        if (k.label==*argv) {
+            shift();
             return true;
         }
 
+        if (k.style==key::compact) {
+            if (auto p = match_compact_key(k.label.c_str())) {
+                if (!*p) shift();
+                return true;
+            }
+        }
+
         return false;
+    }
+
+    const char* match_compact_key(const char* k) {
+        unsigned keylen = std::strlen(k);
+
+        unsigned prefix_max = std::min(keylen-1, optoff);
+        for (std::size_t l = 0; l<=prefix_max; ++l) {
+            if (l && strncmp(*argv, k, l)) break;
+            if (strncmp(*argv+optoff, k+l, keylen-l)) continue;
+            optoff += keylen-l;
+            return *argv+optoff;
+        }
+
+        return nullptr;
     }
 
 };
-
-    inline bool match_flag(const char* key, state& st) P
-        if (!std::strcmp(*st.argv, key)) {
-            shift(argc, argv, 1);
-            return true;
-        }
-
-        return false;
-    }
-}
 
 // Option specification.
 // Constructed with option(sink, [parser,] [flag | option-key, ...]).
@@ -401,76 +299,48 @@ struct state {
 // There is currently no support for combining flags into a single argument.
 
 struct option {
-    std::function<bool (const char*)> setter;
-    std::vector<std::string> keys;
+    sink s;
+    std::vector<key> keys;
     std::string prefkey;
+    int count = 0;
+
     bool is_flag = false;
+    bool is_ephemeral = false;
     bool is_single = false;
-    bool discard = false;
-    bool mandatory = false;
+    bool is_mandatory = false;
 
-    // If no parser is given, pick defautl parser based on value
-    // of sink reference, or value_type of sink adaptor.
-
-
-
-    template <typename Sink, typename... Rest>
-    option(Sink sink, Rest&&... rest) {
-
-        setter = [sink = std::move(sink)](auto&& value) {
-            sink = value;
-        };
-
-        parser = [&setter](const char* t) -> bool {
-            auto 
-        };
-
-
-        setter = [sink = std::move(sink), p = std::move(p)](const char* arg) -> bool {
-            return sink << p(arg);
-        }
+    template <typename... Rest>
+    explicit option(sink s, Rest&&... rest): s(std::move(s)) {
+        init_(std::forward<Rest>(rest)...);
     }
 
-    template <typename Sink, Parse, typename... Keys>
-    option(Sink sink, const flag_t& fl, Keys... keys) {
-        accumulate_keys(keys...);
-        is_flag = true;
-        setter = [sink = std::move(sink)](const char*) -> bool {
-            return sink = true;
-        }
+    void init_() {}
+
+    template <typename... Rest>
+    void init_(enum option_flag f, Rest&&... rest) {
+        is_flag      |= f & flag;
+        is_ephemeral |= f & ephemeral;
+        is_single    |= f & single;
+        is_mandatory |= f & mandatory;
+        init_(std::forward<Rest>(rest)...);
     }
 
-    template <typename... Keys>
-    void accumulate_keys(char short_opt, Keys... rest) {
-        keys.push_back(std::string("-")+short_opt);
-        if (keys.back().size()>prefkey.size()) prefkey = keys.back();
-        accumulate_keys(rest...);
+    template <typename... Rest>
+    void init_(key k, Rest&&... rest) {
+        if (k.label.length()>prefkey.length()) prefkey = k.label;
+        keys.push_back(std::move(k));
+        init_(std::forward<Rest>(rest)...);
     }
-
-    template <typename... Keys>
-    void accumulate_keys(const char* long_opt, Keys... rest) {
-        if (long_opt && *long_opt) keys.push_back(long_opt);
-        if (keys.back().size()>prefkey.size()) prefkey = keys.back();
-        accumulate_keys(rest...);
-    }
-
-    template <typename... Keys>
-    void accumulate_keys(const discard_tag&, Keys... rest) {
-        discard = true;
-        accumulate_keys(rest...);
-    }
-
-    void accumulate_keys() {}
 
     std::string preferred_key() const {
         return prefkey;
     }
 
-    maybe<const char*> match(int& argc, char** argv) {
+    maybe<const char*> match(state& st) {
         if (is_flag) {
             for (auto& k: keys) {
-                if (impl::match_flag(k.c_str(), argc, argv)) {
-                    setter(nullptr);
+                if (st.match_flag(k)) {
+                    set(k.label, nullptr);
                     return "";
                 }
             }
@@ -478,31 +348,34 @@ struct option {
         }
         else if (!keys.empty()) {
             for (auto& k: keys) {
-                if (auto ma = impl::match_option(k.c_str(), argc, argv)) {
-                    if (!ma.value()) throw parse_opt_error(k, "missing argument");
-                    if (!setter(ma.value())) throw parse_opt_error(k, "argument parse error");
-                    return ma;
+                if (auto param = st.match_option(k)) {
+                    set(k.label, param);
+                    return param;
                 }
             }
             return nothing;
         }
         else {
-            const char* arg = *argv;
-            if (!setter(*argv)) return nothing;
-
-            impl::shift(argc, argv, 1);
-            return arg;
+            const char* param = *st.argv;
+            st.shift();
+            set("", param);
+            return param;
         }
     }
 
-    void set(const char* arg) {
-        if (!setter(arg)) throw parse_opt_error(k, "argument parse error");
+    void set(const std::string& k, const char* arg) {
+        cset(k, arg);
+        ++count;
     }
 
-    bool has_key(const char* arg) const {
-        if (keys.emmpty() && (!arg  || !*arg)) return true;
-        for (const std::string& k: keys) {
-            if (!std::strcmp(arg, keys.c_str())) return true;
+    void cset(const std::string& k, const char* arg) const {
+        if (!s(arg)) throw option_parse_error(k);
+    }
+
+    bool has_key(const std::string& arg) const {
+        if (keys.empty() && arg.empty()) return true;
+        for (const auto& k: keys) {
+            if (arg==k.label) return true;
         }
         return false;
     }
@@ -551,6 +424,7 @@ struct option_set {
                 out << escape(p.second) << '\n';
             }
         }
+        return out;
     }
 
     friend std::istream& operator>>(std::istream& in, option_set& s) {
@@ -562,51 +436,51 @@ struct option_set {
             bool escape = false; // true => previous character was backslash.
 
             // Returns true if parsing of a record is complete, viz. st.quote is false.
-            bool parse_line = (const std::string &line) {
+            bool parse_line(const std::string &line) {
                 for (auto c: line) {
-                    if (st.ws) {
+                    if (ws) {
                         if (c==' ' || c=='\t' || c=='\n') continue;
-                        st.ws = false;
+                        ws = false;
                         i = 1;
                     }
 
-                    if (st.quote) {
-                        if (c!='\'') st.fields[i] += c;
-                        else st.quote = false;
+                    if (quote) {
+                        if (c!='\'') fields[i] += c;
+                        else quote = false;
                     }
                     else {
-                        if (st.escape) {
-                            st.fields[i] += c;
-                            st.escape = false;
+                        if (escape) {
+                            fields[i] += c;
+                            escape = false;
                         }
                         else if (c=='\\') {
-                            st.escape = truel
+                            escape = true;
                         }
-                        else if (c=='\\'') {
-                            st.quote = true;
+                        else if (c=='\'') {
+                            quote = true;
                         }
                         else if (c==' ' || c=='\t' || c=='\n') {
-                            st.ws = true;
+                            ws = true;
                         }
-                        else st.fields[i]+=c;
+                        else fields[i]+=c;
                     }
                 }
-                return !st.quote;
+                return !quote;
             };
 
             void push_option(option_set& s) const {
                 // A single field => key is empty, field is value.
-                if (state.i==0) {
-                    s.emplace_back("", std::move(state.fields[0]));
+                if (i==0) {
+                    s.olist.emplace_back("", std::move(fields[0]));
                 }
                 else {
-                    s.emplace_back(std::move(state.fields[0]), std::move(state.fields[1]));
+                    s.olist.emplace_back(std::move(fields[0]), std::move(fields[1]));
                 }
             }
         } state;
 
         for (std::string line; std::getline(in, line); ) {
-            if (parse_line(state, line)) {
+            if (state.parse_line(line)) {
                 state.push_option(s);
                 state = parse_state{};
             }
@@ -626,8 +500,8 @@ option_set run(const Options& options, const option_set& restore = {}) {
     for (auto& kv: restore) {
         for (const option& o: options) {
             if (o.has_key(kv.first)) {
-                o.set(kv.second.c_str());
-                collate.push_back(kv);
+                o.cset(kv.first, kv.second.c_str());
+                collate.olist.push_back(kv);
                 break;
             }
         }
@@ -637,38 +511,49 @@ option_set run(const Options& options, const option_set& restore = {}) {
 }
 
 template <typename Options>
-option_set run(const Options& options, int& argc, char** &argv, const option_set& restore = {}) {
+option_set run(const Options& options_in, int& argc, char** &argv, const option_set& restore = {}) {
+    using std::begin;
+    using std::end;
+    std::vector<option> options(begin(options_in), end(options_in));
+
+    state st{argc, argv};
     option_set collate = run(options, restore);
 
-    while (*argv) {
+    while (st) {
         // Try options with a key first.
-        for (const option& o: options) {
+        for (option& o: options) {
+            if (o.is_single && o.count) continue;
             if (o.keys.empty()) continue;
-            if (auto ma = o.match(argc, argv)) {
-                if (!o.discard) collate.emplace_back(o.preferred_key(), ma.value());
+            if (auto ma = o.match(st)) {
+                if (!o.is_ephemeral) collate.olist.emplace_back(o.preferred_key(), ma.value());
                 goto next;
             }
         }
 
         // Literal "--" terminates option parsing.
         if (!std::strcmp(*argv, "--")) {
-            shift(argc, argv);
+            st.shift();
             return collate;
         }
 
         // Try free options.
-        for (const option& o: options) {
+        for (option& o: options) {
+            if (o.is_single && o.count) continue;
             if (!o.keys.empty()) continue;
-            if (auto ma = o.match(argc, argv)) {
-                if (!o.discard) collate.emplace_back("", ma.value());
+            if (auto ma = o.match(st)) {
+                if (!o.is_ephemeral) collate.olist.emplace_back("", ma.value());
                 goto next;
             }
         }
 
         // Nothing matched, so increment argv.
-        ++argv;
+        st.skip();
 
     next: ;
+    }
+
+    for (option& o: options) {
+        if (o.is_mandatory && !o.count) throw missing_mandatory_option(o.prefkey);
     }
 
     return collate;

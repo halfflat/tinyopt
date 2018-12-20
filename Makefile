@@ -8,7 +8,7 @@ all:: demo unit
 demo-src:=demo.cc
 demo-obj:=$(patsubst %.cc, %.o, $(demo-src))
 
-test-src:=unit.cc test_adaptor.cc test_maybe.cc
+test-src:=unit.cc test_sink.cc test_maybe.cc
 test-obj:=$(patsubst %.cc, %.o, $(test-src))
 
 depends:=$(patsubst %.cc, %.d, $(demo-src) $(test-src))

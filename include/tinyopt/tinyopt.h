@@ -10,31 +10,10 @@
 #include <type_traits>
 #include <vector>
 
+#include <tinyopt/common.h>
 #include <tinyopt/maybe.h>
-#include <tinyopt/parsers.h>
 
 namespace to {
-
-struct parse_opt_error: public std::runtime_error {
-    parse_opt_error(const std::string& s): std::runtime_error(s) {}
-    parse_opt_error(const char *arg, const std::string& s):
-        std::runtime_error(s+": "+arg) {}
-};
-
-void usage(const char* argv0, const std::string& usage_str) {
-    const char* basename = std::strrchr(argv0, '/');
-    basename = basename? basename+1: argv0;
-
-    std::cout << "Usage: " << basename << " " << usage_str << "\n";
-}
-
-void usage(const char* argv0, const std::string& usage_str, const std::string& parse_err) {
-    const char* basename = std::strrchr(argv0, '/');
-    basename = basename? basename+1: argv0;
-
-    std::cerr << basename << ": " << parse_err << "\n";
-    std::cerr << "Usage: " << basename << " " << usage_str << "\n";
-}
 
 template <typename V = std::string, typename P = default_parser<V>, typename = std::enable_if_t<!std::is_same<V, void>::value>>
 maybe<V> parse_opt(char **& argp, char shortopt, const char* longopt=nullptr, const P& parse = P{}) {
@@ -51,7 +30,7 @@ maybe<V> parse_opt(char **& argp, char shortopt, const char* longopt=nullptr, co
         const char* eq = std::strchr(rest, '=');
 
         if (!std::strcmp(rest, longopt)) {
-            if (!argp[1]) throw parse_opt_error(arg, "missing argument");
+            if (!argp[1]) throw missing_argument(arg);
             text = argp[1];
             argp += 2;
         }
@@ -64,7 +43,7 @@ maybe<V> parse_opt(char **& argp, char shortopt, const char* longopt=nullptr, co
         }
     }
     else if (shortopt && arg[1]==shortopt && arg[2]==0) {
-        if (!argp[1]) throw parse_opt_error(arg, "missing argument");
+        if (!argp[1]) throw missing_argument(arg);
         text = argp[1];
         argp += 2;
     }
@@ -74,7 +53,7 @@ maybe<V> parse_opt(char **& argp, char shortopt, const char* longopt=nullptr, co
 
     auto v = parse(text);
 
-    if (!v) throw parse_opt_error(arg, "failed to parse option argument");
+    if (!v) throw option_parse_error(arg);
     return v;
 }
 
