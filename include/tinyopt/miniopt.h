@@ -44,6 +44,9 @@ namespace impl {
     template <typename R, typename X> struct fn_arg_type<R (X)> { using type = X; };
     template <typename R, typename X> struct fn_arg_type<R (*)(X)> { using type = X; };
     template <typename R, typename C, typename X> struct fn_arg_type<R (C::*)(X)> { using type = X; };
+    template <typename R, typename C, typename X> struct fn_arg_type<R (C::*)(X) const> { using type = X; };
+    template <typename R, typename C, typename X> struct fn_arg_type<R (C::*)(X) volatile> { using type = X; };
+    template <typename R, typename C, typename X> struct fn_arg_type<R (C::*)(X) const volatile> { using type = X; };
 
     template <typename...> struct void_type { using type = void; };
 }
@@ -80,25 +83,26 @@ struct sink {
     bool operator()(const char* param) const { return op(param); }
     std::function<bool (const char*)> op;
 
-    // Convenience functions for construction of sink actions
-    // with explicit or implicit parser.
-
-    template <typename F, typename A = unary_argument_type_t<F>>
-    friend sink action(F f) {
-        return sink(sink::action,
-            [f = std::move(f)](const char* arg) -> bool {
-                return f << default_parser<A>{}(arg);
-            });
-    }
-
-    template <typename F, typename P>
-    friend sink action(F f, P parser) {
-        return sink(sink::action,
-            [f = std::move(f), parser = std::move(parser)](const char* arg) -> bool {
-                return f << parser(arg);
-            });
-    }
 };
+
+// Convenience functions for construction of sink actions
+// with explicit or implicit parser.
+
+template <typename F, typename A = unary_argument_type_t<F>>
+sink action(F f) {
+    return sink(sink::action,
+        [f = std::move(f)](const char* arg) -> bool {
+            return f << default_parser<A>{}(arg);
+        });
+}
+
+template <typename F, typename P>
+sink action(F f, P parser) {
+    return sink(sink::action,
+        [f = std::move(f), parser = std::move(parser)](const char* arg) -> bool {
+            return f << parser(arg);
+        });
+}
 
 /* Sink adaptors:
  *

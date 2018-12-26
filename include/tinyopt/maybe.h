@@ -41,7 +41,7 @@ struct maybe {
 
     const T& operator*() const & noexcept { return *vptr(); }
     T&& operator*() && { return std::move(*vptr()); }
-    explicit operator bool() const noexcept { return ok; }
+    operator bool() const noexcept { return ok; }
 
 private:
     T* vptr() noexcept { return reinterpret_cast<T*>(data); }
@@ -88,7 +88,7 @@ struct maybe<void> {
     template <typename U>
     maybe& operator=(U&& v) noexcept { return ok = true, *this; }
 
-    constexpr explicit operator bool() const noexcept { return ok; }
+    constexpr operator bool() const noexcept { return ok; }
 };
 
 constexpr maybe<void> something(true);
