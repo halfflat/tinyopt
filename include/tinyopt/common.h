@@ -70,6 +70,7 @@ inline void usage(const char* argv0, const std::string& usage_str, const std::st
 template <typename V>
 struct default_parser {
     maybe<V> operator()(const char* text) const {
+        if (!text) return nothing;
         V v;
         std::istringstream stream(text);
         stream >> v;
@@ -97,6 +98,7 @@ public:
     }
 
     maybe<V> operator()(const char* text) const {
+        if (!text) return nothing;
         for (const auto& p: map_) {
             if (text==p.first) return p.second;
         }
@@ -131,6 +133,8 @@ public:
     delimited_parser(char delim, Q&& parse): delim_(delim), parse_(std::forward<Q>(parse)) {}
 
     maybe<std::vector<inner_value_type>> operator()(const char* text) const {
+        if (!text) return nothing;
+
         std::vector<inner_value_type> values;
 
         std::size_t n = std::strlen(text);
