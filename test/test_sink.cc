@@ -1,22 +1,9 @@
 #include <cstdlib>
 #include <string>
 
-#include <cxxabi.h>
-
 #include <gtest/gtest.h>
 
 #include <tinyopt/miniopt.h>
-
-std::string demangle(const char* name) {
-    int status = 0;
-    const char* buf = abi::__cxa_demangle(name, nullptr, nullptr, &status);
-    if (buf) {
-        std::string d(buf);
-        free((void*)buf);
-        return d;
-    }
-    return "";
-}
 
 TEST(sink, refctor) {
     int a;
@@ -95,4 +82,12 @@ TEST(sink, adaptors) {
     x = 2;
     EXPECT_TRUE(a3("fish"));
     EXPECT_EQ(17, x);
+
+    x = 0;
+    auto a4 = to::increment(x);
+    EXPECT_TRUE(a4(nullptr));
+    EXPECT_EQ(1, x);
+    x = 1;
+    EXPECT_TRUE(a4("ketchup"));
+    EXPECT_EQ(2, x);
 }

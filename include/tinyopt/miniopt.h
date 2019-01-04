@@ -168,9 +168,11 @@ struct key {
     std::string label;
     enum style { shortfmt, longfmt, compact } style = shortfmt;
 
-    key(std::string label): label(std::move(label)) {
+    key(std::string l): label(std::move(l)) {
         if (label[0]=='-' && label[1]=='-') style = longfmt;
     }
+
+    key(const char* label): key(std::string(label)) {}
 
     key(std::string label, enum style style):
         label(std::move(label)), style(style) {}
@@ -178,15 +180,15 @@ struct key {
 
 inline namespace literals {
 
-inline key operator""_short(const char* label) {
+inline key operator""_short(const char* label, std::size_t) {
     return key(label, key::shortfmt);
 }
 
-inline key operator""_long(const char* label) {
+inline key operator""_long(const char* label, std::size_t) {
     return key(label, key::longfmt);
 }
 
-inline key operator""_compact(const char* label) {
+inline key operator""_compact(const char* label, std::size_t) {
     return key(label, key::compact);
 }
 
@@ -314,7 +316,7 @@ struct option {
     bool is_mandatory = false;
 
     template <typename... Rest>
-    explicit option(sink s, Rest&&... rest): s(std::move(s)) {
+    option(sink s, Rest&&... rest): s(std::move(s)) {
         init_(std::forward<Rest>(rest)...);
     }
 
