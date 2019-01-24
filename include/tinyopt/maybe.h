@@ -72,16 +72,16 @@ template <>
 struct maybe<void> {
     bool ok = false;
 
-    constexpr maybe(): ok(false) {}
-    constexpr maybe(nothing_t&): ok(false) {}
-    constexpr maybe(const nothing_t&): ok(false) {}
-    constexpr maybe(nothing_t&&): ok(false) {}
+    constexpr maybe() noexcept: ok(false) {}
+    constexpr maybe(nothing_t&) noexcept: ok(false) {}
+    constexpr maybe(const nothing_t&) noexcept: ok(false) {}
+    constexpr maybe(nothing_t&&) noexcept: ok(false) {}
 
     template <typename X, typename = std::enable_if_t<!is_maybe<X>::value>>
-    constexpr maybe(X&&): ok(true) {}
+    constexpr maybe(X&&) noexcept: ok(true) {}
 
     template <typename U>
-    constexpr maybe(const maybe<U>& m): ok(m.ok) {}
+    constexpr maybe(const maybe<U>& m) noexcept: ok(m.ok) {}
 
     maybe& operator=(nothing_t) noexcept { return ok = false, *this; }
     maybe& operator=(const maybe& m) noexcept { return ok = m.ok, *this; }

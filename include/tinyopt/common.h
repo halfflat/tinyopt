@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iostream>
 #include <iterator>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -141,8 +142,8 @@ public:
         std::vector<char> input(1+n);
         std::copy(text, text+n, input.data());
 
-        for (const char* p = input.data(); *p; ) {
-            const char* q = p;
+        for (char* p = input.data(); *p; ) {
+            char* q = p;
             while (*q && *q!=delim_) ++q;
             *q++ = 0;
 

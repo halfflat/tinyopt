@@ -205,12 +205,16 @@ struct state {
 
     state(int& argc, char** argv): argc(argc), argv(argv) {}
 
+    explicit operator bool() const {
+        return *argv;
+    }
+
     void shift(unsigned n = 1) {
         char** skip = argv;
         while (*skip && n) ++skip, --n;
 
         argc -= (skip-argv);
-        while (*argv++ = *skip++) ;
+        while (*argv++ == *skip++) ;
         optoff = 0;
     }
 
@@ -233,7 +237,7 @@ struct state {
             }
         }
         else if (k.style==key::compact) {
-            if (p = match_compact_key(k.label.c_str())) {
+            if ((p = match_compact_key(k.label.c_str()))) {
                 if (!*p) {
                     p = argv[1];
                     shift(2);
