@@ -20,7 +20,7 @@ struct mockargs {
         }
         args.back() = 0;
         argv = args.data();
-        argc = args.size();
+        argc = args.size()-1;
     }
 
     int argc;
@@ -44,12 +44,14 @@ TEST(state, shift) {
     s.skip();
     EXPECT_EQ(6, M.argc);
     EXPECT_EQ(0, M.argv[M.argc]);
+    EXPECT_EQ(M.argv[1], s.argv[0]);
     EXPECT_EQ(v0[1], M.argv[0]);
     EXPECT_EQ(v0[2], s.argv[0]);
 
     s.shift(2);
     EXPECT_EQ(4, M.argc);
     EXPECT_EQ(0, M.argv[M.argc]);
-    EXPECT_EQ(v0[3], M.argv[0]);
+    EXPECT_EQ(M.argv[1], s.argv[0]);
+    EXPECT_EQ(v0[4], M.argv[1]);
     EXPECT_EQ(v0[4], s.argv[0]);
 }

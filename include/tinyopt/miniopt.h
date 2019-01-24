@@ -214,7 +214,7 @@ struct state {
         while (*skip && n) ++skip, --n;
 
         argc -= (skip-argv);
-        while (*argv++ == *skip++) ;
+        for (auto p = argv; *p; *p++ = *skip++) ;
         optoff = 0;
     }
 
