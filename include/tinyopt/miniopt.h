@@ -225,18 +225,7 @@ struct state {
     const char* match_option(const key& k) {
         const char* p = nullptr;
 
-        if (k.label==*argv) {
-            p = argv[1];
-            shift(2);
-        }
-        else if (k.style==key::longfmt) {
-            auto keylen = k.label.length();
-            if (!std::strncmp(*argv, k.label.c_str(), keylen) && (*argv)[keylen]=='=') {
-                p = &(*argv)[keylen+1];
-                shift();
-            }
-        }
-        else if (k.style==key::compact) {
+        if (k.style==key::compact) {
             if ((p = match_compact_key(k.label.c_str()))) {
                 if (!*p) {
                     p = argv[1];
@@ -245,21 +234,31 @@ struct state {
                 else shift();
             }
         }
+        else if (!optoff && k.label==*argv) {
+            p = argv[1];
+            shift(2);
+        }
+        else if (!optoff && k.style==key::longfmt) {
+            auto keylen = k.label.length();
+            if (!std::strncmp(*argv, k.label.c_str(), keylen) && (*argv)[keylen]=='=') {
+                p = &(*argv)[keylen+1];
+                shift();
+            }
+        }
 
         return p;
     }
 
     bool match_flag(const key& k) {
-        if (k.label==*argv) {
-            shift();
-            return true;
-        }
-
         if (k.style==key::compact) {
             if (auto p = match_compact_key(k.label.c_str())) {
                 if (!*p) shift();
                 return true;
             }
+        }
+        else if (!optoff && k.label==*argv) {
+            shift();
+            return true;
         }
 
         return false;
