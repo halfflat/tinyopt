@@ -8,7 +8,13 @@
 
 namespace to {
 
+// nothing is a special value that converts
+// to an empty maybe<T> for any T.
+
 constexpr struct nothing_t {} nothing;
+
+// maybe<T> represents an optional value of type T,
+// with an interface similar to C++17 std::optional.
 
 template <typename T>
 struct maybe {
@@ -68,6 +74,8 @@ namespace impl {
 template <typename T>
 using is_maybe = impl::is_maybe_<std::remove_cv_t<std::remove_reference_t<T>>>;
 
+// maybe<void> acts as a maybe<T> with an empty or inaccessible wrapped value.
+
 template <>
 struct maybe<void> {
     bool ok = false;
@@ -91,10 +99,19 @@ struct maybe<void> {
     constexpr operator bool() const noexcept { return ok; }
 };
 
+// something is a non-empty maybe<void> value.
+
 constexpr maybe<void> something(true);
+
+// just<X> converts a value of type X to a maybe<X> containing the value.
 
 template <typename X>
 auto just(X&& x) { return maybe<std::decay_t<X>>(std::forward<X>(x)); }
+
+// operator<< offers monadic-style chaining of maybe<X> values:
+// (f << m) evaluates to an empty maybe if m is empty, or else to
+// a maybe<V> value wrapping the result of applying f to the value
+// in m.
 
 template <
     typename F,
