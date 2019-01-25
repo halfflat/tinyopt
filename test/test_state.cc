@@ -213,7 +213,7 @@ TEST(state, match_multi_compact) {
     to::key k4("key/four", to::key::compact);
 
     {
-        mockargs M("key/one/three/two key/four rest");
+        mockargs M("key/one/three/two\0key/four\0rest\0\0");
         to::state s(M.argc, M.argv);
 
         EXPECT_TRUE(s.match_flag(k1));
