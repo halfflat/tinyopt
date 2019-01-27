@@ -23,7 +23,7 @@ maybe<V> parse_opt(char **& argp, char shortopt, const char* longopt=nullptr, co
         return nothing;
     }
 
-    std::string text;
+    const char* text;
 
     if (arg[1]=='-' && longopt) {
         const char* rest = arg+2;

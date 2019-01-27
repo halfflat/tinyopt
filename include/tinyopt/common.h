@@ -114,7 +114,7 @@ public:
 template <typename KeywordPairs>
 auto keywords(const KeywordPairs& pairs) {
     using std::begin;
-    using value_type = std::decay_t<decltype(std::get<0>(*begin(pairs)))>;
+    using value_type = std::decay_t<decltype(std::get<1>(*begin(pairs)))>;
     return keyword_parser<value_type>(pairs);
 }
 

@@ -20,7 +20,7 @@ gtest-src:=$(gtest-top)/src/gtest-all.cc
 vpath %.cc $(top)test
 vpath %.cc $(top)demo
 
-OPTFLAGS?=-O3 -march=native
+OPTFLAGS?=-O0 -march=native
 CXXFLAGS+=$(OPTFLAGS) -MMD -MP -std=c++14 -g -pthread
 CPPFLAGS+=-isystem $(gtest-inc) -I $(top)include
 

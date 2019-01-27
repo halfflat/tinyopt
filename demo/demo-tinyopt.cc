@@ -1,4 +1,5 @@
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <tinyopt/tinyopt.h>
@@ -43,29 +44,30 @@ int cranberry() {
 int main(int argc, char** argv) {
     int apple = 0;
     date_kind date = date_kind::none;
+    std::vector<std::string> remaining;
 
     try {
         char** arg = argv+1;
         while (*arg) {
             if (apple << to::parse_opt<int>(arg, 'a', "apple") ||
                 banana << to::parse_opt<std::string>(arg, 'b', "banana") ||
-                cranberry << to::parse_opt<void>(arg, 'c', "cranberry") ||
+                cranberry << to::parse_opt(arg, 'c', "cranberry") ||
                 date << to::parse_opt<date_kind>(arg, 'd', "date", to::keywords(date_tbl)))
             {
                 continue;
             }
 
-            if (to::parse_opt<void>(arg, 'h', "help")) {
+            if (to::parse_opt(arg, 'h', "help")) {
                 to::usage(argv[0], usage_str);
                 return 0;
             }
 
-            if (*argv=='-') throw to::unrecognized_option(*arg);
-            remaining.push_back(*argv++);
+            if (*arg[0]=='-') throw to::unrecognized_option(*arg);
+            remaining.push_back(*arg++);
         }
 
         std::cout << "apple: " << apple << '\n';
-        std::cout << "date: " << date_tbl[date].first << '\n';
+        std::cout << "date: " << date_tbl[(int)date].first << '\n';
         std::cout << "remaining arguments:\n";
         for (auto& r: remaining) std::cout << "  " << r << '\n';
     }

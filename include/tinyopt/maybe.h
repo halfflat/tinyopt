@@ -133,9 +133,22 @@ maybe<R> operator<<(F&& f, const maybe<T>& m) {
     if (m) return f(*m); else return nothing;
 }
 
-template <typename F>
-auto operator<<(F&& f, const maybe<void>& m) -> maybe<std::decay_t<decltype(f())>> {
+template <
+    typename F,
+    typename R = std::decay_t<decltype(std::declval<F>()())>,
+    typename = std::enable_if_t<std::is_same<R, void>::value>
+>
+maybe<void> operator<<(F&& f, const maybe<void>& m) {
     return m? (f(), something): nothing;
+}
+
+template <
+    typename F,
+    typename R = std::decay_t<decltype(std::declval<F>()())>,
+    typename = std::enable_if_t<!std::is_same<R, void>::value>
+>
+maybe<R> operator<<(F&& f, const maybe<void>& m) {
+    return m? just(f()): nothing;
 }
 
 // If the lhs is not functional, return a maybe value with the result
