@@ -3,15 +3,15 @@
 
 top:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-all:: demo unit
+all:: demo-tinyopt unit
 
-demo-src:=demo.cc
-demo-obj:=$(patsubst %.cc, %.o, $(demo-src))
+demo-tinyopt-src:=demo-tinyopt.cc
+demo-tinyopt-obj:=$(patsubst %.cc, %.o, $(demo-tinyopt-src))
 
 test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc
 test-obj:=$(patsubst %.cc, %.o, $(test-src))
 
-depends:=$(patsubst %.cc, %.d, $(demo-src) $(test-src))
+depends:=$(patsubst %.cc, %.d, $(demo-tinyopt-src) $(test-src)) gtest.d
 
 gtest-top:=$(top)test/googletest/googletest
 gtest-inc:=$(gtest-top)/include
@@ -33,7 +33,7 @@ gtest.o: ${gtest-src}
 unit: $(test-obj) gtest.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-demo: $(demo-obj)
+demo-tinyopt: $(demo-tinyopt-obj)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 clean:

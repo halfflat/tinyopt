@@ -138,6 +138,9 @@ auto operator<<(F&& f, const maybe<void>& m) -> maybe<std::decay_t<decltype(f())
     return m? (f(), something): nothing;
 }
 
+// If the lhs is not functional, return a maybe value with the result
+// of assigning the value in the rhs, or nothing if the rhs is nothing.
+
 template <typename T, typename U>
 auto operator<<(T& x, const maybe<U>& m) -> maybe<std::decay_t<decltype(x=*m)>> {
     if (m) return x=*m; else return nothing;
