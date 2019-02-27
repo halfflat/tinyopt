@@ -8,7 +8,7 @@ all:: demo-tinyopt unit
 demo-tinyopt-src:=demo-tinyopt.cc
 demo-tinyopt-obj:=$(patsubst %.cc, %.o, $(demo-tinyopt-src))
 
-test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc
+test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc test_parse.cc
 test-obj:=$(patsubst %.cc, %.o, $(test-src))
 
 depends:=$(patsubst %.cc, %.d, $(demo-tinyopt-src) $(test-src)) gtest.d
@@ -40,4 +40,4 @@ clean:
 	rm -f $(demo-obj) $(test-obj)
 
 realclean: clean
-	rm -f demo unit gtest.o $(depends)
+	rm -f demo-tinyopt unit gtest.o $(depends)

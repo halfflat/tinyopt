@@ -11,33 +11,170 @@
 
 namespace to {
 
-// TODO: Arrange: state; sinks; keys; options; runner.
-
-// An option specification comprises zero or more keys (e.g. "-a", "--foo"), a
-// sink (where the parsed argument will be sent), a parser - which may be the
-// default parser - and zero or more flags that modify its behaviour.
+// Option keys
+// -----------
 //
-// Option parsers are shared between bigopt and tinyopt, and are described in
-// tinyopt/parsers.h. If no parser is supplied, a default parser will be used
-// based on the value type of the sink.
+// A key is how the option is specified in an argument list,
+// and is typically represented as a 'short' (e.g. '-a')
+// option or a 'long' option (e.g. '--apple').
+//
+// The value for an option can always be taken from the
+// next argument in the list, but in addition can be specified
+// together with the key itself, depending on the properties
+// of the option key:
+//
+//     --key=value         'Long' style argument for key "--key"
+//     -kvalue             'Compact' style argument for key "-k"
+//
+// Compact option keys can be combined in the one item in
+// the argument list, if the options do not take any values
+// (that is, they are flags). For example, if -a, -b are flags
+// and -c takes an integer argument, with all three keys marked
+// as compact, then an item '-abc3' in the argument list
+// will be parsed in the same way as the sequence of items
+// '-a', '-b', '-c', '3'.
+//
+// An option without a key will match any item in the argument
+// list; options with keys are always checked first.
 
-// Option flags:
+struct key {
+    std::string label;
+    enum style { shortfmt, longfmt, compact } style = shortfmt;
 
-enum option_flag {
-    flag = 1,       // Option takes no parameter.
-    ephemeral = 2,  // Option is not saved in returned results.
-    single = 4,     // Option is parsed at most once.
-    mandatory = 8   // Option must be present in argument list.
+    key(std::string l): label(std::move(l)) {
+        if (label[0]=='-' && label[1]=='-') style = longfmt;
+    }
+
+    key(const char* label): key(std::string(label)) {}
+
+    key(std::string label, enum style style):
+        label(std::move(label)), style(style) {}
 };
 
-/* Sinks wrap a function that takes a pointer to an option parameter and
- * stores or acts upon the parsed result.
- *
- * They can be constructed from an lvalue reference or a functional
- * object (via the `action` function) with or without an explicit parser
- * function. If no parser is given, a default one is used if the correct
- * value type can be determined.
- */
+inline namespace literals {
+
+inline key operator""_short(const char* label, std::size_t) {
+    return key(label, key::shortfmt);
+}
+
+inline key operator""_long(const char* label, std::size_t) {
+    return key(label, key::longfmt);
+}
+
+inline key operator""_compact(const char* label, std::size_t) {
+    return key(label, key::compact);
+}
+
+} // namespace literals
+
+// Argument state
+// --------------
+//
+// to::state represents the collection of command line arguments.
+// Mutating operations (shift(), successful option matching, etc.)
+// will modify the underlying set of arguments used to construct the
+// state object.
+
+struct state {
+    int& argc;
+    char** argv;
+    unsigned optoff = 0;
+
+    state(int& argc, char** argv): argc(argc), argv(argv) {}
+
+    // False => no more arguments.
+    explicit operator bool() const { return *argv; }
+
+    // Shift arguments left in-place.
+    void shift(unsigned n = 1) {
+        char** skip = argv;
+        while (*skip && n) ++skip, --n;
+
+        argc -= (skip-argv);
+        for (auto p = argv; *p; *p++ = *skip++) ;
+        optoff = 0;
+    }
+
+    // Skip current argument without modifying list.
+    void skip() {
+         if (*argv) ++argv;
+    }
+
+    // Match an option given by the key which takes an argument.
+    // If successful, consume option and argument and return pointer to
+    // argument string, else return nullptr.
+    const char* match_option(const key& k) {
+        const char* p = nullptr;
+
+        if (k.style==key::compact) {
+            if ((p = match_compact_key(k.label.c_str()))) {
+                if (!*p) {
+                    p = argv[1];
+                    shift(2);
+                }
+                else shift();
+            }
+        }
+        else if (!optoff && k.label==*argv) {
+            p = argv[1];
+            shift(2);
+        }
+        else if (!optoff && k.style==key::longfmt) {
+            auto keylen = k.label.length();
+            if (!std::strncmp(*argv, k.label.c_str(), keylen) && (*argv)[keylen]=='=') {
+                p = &(*argv)[keylen+1];
+                shift();
+            }
+        }
+
+        return p;
+    }
+
+    // Match a flag given by the key.
+    // If successful, consume flag and return true, else return false.
+    bool match_flag(const key& k) {
+        if (k.style==key::compact) {
+            if (auto p = match_compact_key(k.label.c_str())) {
+                if (!*p) shift();
+                return true;
+            }
+        }
+        else if (!optoff && k.label==*argv) {
+            shift();
+            return true;
+        }
+
+        return false;
+    }
+
+    // Compact-style keys can be combined in one argument; combined keys
+    // with a common prefix only need to supply the prefix once at the
+    // beginning of the argument.
+    const char* match_compact_key(const char* k) {
+        unsigned keylen = std::strlen(k);
+
+        unsigned prefix_max = std::min(keylen-1, optoff);
+        for (std::size_t l = 0; l<=prefix_max; ++l) {
+            if (l && strncmp(*argv, k, l)) break;
+            if (strncmp(*argv+optoff, k+l, keylen-l)) continue;
+            optoff += keylen-l;
+            return *argv+optoff;
+        }
+
+        return nullptr;
+    }
+};
+
+// Sinks and actions
+// -----------------
+//
+// Sinks wrap a function that takes a pointer to an option parameter and
+// stores or acts upon the parsed result.
+//
+// They can be constructed from an lvalue reference or a functional
+// object (via the `action` function) with or without an explicit parser
+// function. If no parser is given, a default one is used if the correct
+// value type can be determined.
 
 namespace impl {
     template <typename T> struct fn_arg_type { using type = void; };
@@ -104,13 +241,12 @@ sink action(F f, P parser) {
         });
 }
 
-/* Sink adaptors:
- *
- * These adaptors constitute short cuts for making actions that
- * count the occurance of a flag, set a fixed value when a flag
- * is provided, or for appending an option parameter onto a vector
- * of values.
- */
+// Sink adaptors:
+//
+// These adaptors constitute short cuts for making actions that
+// count the occurance of a flag, set a fixed value when a flag
+// is provided, or for appending an option parameter onto a vector
+// of values.
 
 // Push parsed option parameter on to container.
 template <typename Container, typename P = default_parser<typename Container::value_type>>
@@ -139,179 +275,26 @@ sink increment(V& v) {
 }
 
 
-// Option keys:
+// Option specification
+// --------------------
 //
-// A key is how the option is specified in an argument list,
-// and is typically represented as a 'short' (e.g. '-a')
-// option or a 'long' option (e.g. '--apple').
+// An option specification comprises zero or more keys (e.g. "-a", "--foo"),
+// a sink (where the parsed argument will be sent), a parser - which may be
+// the default parser - and zero or more flags that modify its behaviour.
 //
-// The value for an option can always be taken from the
-// next argument in the list, but in addition can be specified
-// together with the key itself, depending on the properties
-// of the option key:
-//
-//     --key=value         'Long' style argument for key "--key"
-//     -kvalue             'Compact' style argument for key "-k"
-//
-// Compact option keys can be combined in the one item in
-// the argument list, if the options do not take any values
-// (that is, they are glags). For example, if -a, -b are flags
-// and -c takes an integer argument, with all three keys marked
-// as compact, then an item '-abc3' in the argument list
-// will be parsed in the same way as the sequence of items
-// '-a', '-b', '-c', '3'.
-//
-// An option without a key will match any item in the argument
-// list; options with keys are always checked first.
+// Option flags:
 
-struct key {
-    std::string label;
-    enum style { shortfmt, longfmt, compact } style = shortfmt;
-
-    key(std::string l): label(std::move(l)) {
-        if (label[0]=='-' && label[1]=='-') style = longfmt;
-    }
-
-    key(const char* label): key(std::string(label)) {}
-
-    key(std::string label, enum style style):
-        label(std::move(label)), style(style) {}
+enum option_flag {
+    flag = 1,       // Option takes no parameter.
+    ephemeral = 2,  // Option is not saved in returned results.
+    single = 4,     // Option is parsed at most once.
+    mandatory = 8   // Option must be present in argument list.
 };
-
-inline namespace literals {
-
-inline key operator""_short(const char* label, std::size_t) {
-    return key(label, key::shortfmt);
-}
-
-inline key operator""_long(const char* label, std::size_t) {
-    return key(label, key::longfmt);
-}
-
-inline key operator""_compact(const char* label, std::size_t) {
-    return key(label, key::compact);
-}
-
-} // namespace literals
-
-// Option parsing:
-//
-
-
-struct state {
-    int& argc;
-    char** argv;
-    unsigned optoff = 0;
-
-    state(int& argc, char** argv): argc(argc), argv(argv) {}
-
-    explicit operator bool() const {
-        return *argv;
-    }
-
-    void shift(unsigned n = 1) {
-        char** skip = argv;
-        while (*skip && n) ++skip, --n;
-
-        argc -= (skip-argv);
-        for (auto p = argv; *p; *p++ = *skip++) ;
-        optoff = 0;
-    }
-
-    void skip() {
-         if (*argv) ++argv;
-    }
-
-    const char* match_option(const key& k) {
-        const char* p = nullptr;
-
-        if (k.style==key::compact) {
-            if ((p = match_compact_key(k.label.c_str()))) {
-                if (!*p) {
-                    p = argv[1];
-                    shift(2);
-                }
-                else shift();
-            }
-        }
-        else if (!optoff && k.label==*argv) {
-            p = argv[1];
-            shift(2);
-        }
-        else if (!optoff && k.style==key::longfmt) {
-            auto keylen = k.label.length();
-            if (!std::strncmp(*argv, k.label.c_str(), keylen) && (*argv)[keylen]=='=') {
-                p = &(*argv)[keylen+1];
-                shift();
-            }
-        }
-
-        return p;
-    }
-
-    bool match_flag(const key& k) {
-        if (k.style==key::compact) {
-            if (auto p = match_compact_key(k.label.c_str())) {
-                if (!*p) shift();
-                return true;
-            }
-        }
-        else if (!optoff && k.label==*argv) {
-            shift();
-            return true;
-        }
-
-        return false;
-    }
-
-    const char* match_compact_key(const char* k) {
-        unsigned keylen = std::strlen(k);
-
-        unsigned prefix_max = std::min(keylen-1, optoff);
-        for (std::size_t l = 0; l<=prefix_max; ++l) {
-            if (l && strncmp(*argv, k, l)) break;
-            if (strncmp(*argv+optoff, k+l, keylen-l)) continue;
-            optoff += keylen-l;
-            return *argv+optoff;
-        }
-
-        return nullptr;
-    }
-
-};
-
-// Option specification.
-// Constructed with option(sink, [parser,] [flag | option-key, ...]).
-//
-// In argument processing, options with keys are tested first,
-// followed by options without keys, which will match any argument.
-//
-// Option behaviour can be customized by providing a custom parser
-// for the value, a sink adaptor for accepting the value, and by
-// the following flags:
-//
-//     to::discard         Do not record this option value in the saved option set.
-//     to::flag            Option takes no argument (sink is assigned with value 'true').
-//     to::single          Option will be matched at most once in the argument list.
-//
-// Options are tested in the order they are supplied to to::run.
-//
-// The value of an option can be taken from the next argument in the argument list,
-// provided with an '=' in the same argument. For example, for an option with keys "-f" and "--foo"
-// will match any of:
-//
-//     -f value
-//     -f=value
-//     --foo value
-//     --foo=value
-//
-// There is currently no support for combining flags into a single argument.
 
 struct option {
     sink s;
     std::vector<key> keys;
     std::string prefkey;
-    int count = 0;
 
     bool is_flag = false;
     bool is_ephemeral = false;
@@ -341,44 +324,11 @@ struct option {
         init_(std::forward<Rest>(rest)...);
     }
 
+    // The preferred key is taken as the longest key in the
+    // key set, and is the key used in a parsed option set
+    // (see below).
     std::string preferred_key() const {
         return prefkey;
-    }
-
-    maybe<const char*> match(state& st) {
-        if (is_flag) {
-            for (auto& k: keys) {
-                if (st.match_flag(k)) {
-                    set(k.label, nullptr);
-                    return "";
-                }
-            }
-            return nothing;
-        }
-        else if (!keys.empty()) {
-            for (auto& k: keys) {
-                if (auto param = st.match_option(k)) {
-                    set(k.label, param);
-                    return param;
-                }
-            }
-            return nothing;
-        }
-        else {
-            const char* param = *st.argv;
-            st.shift();
-            set("", param);
-            return param;
-        }
-    }
-
-    void set(const std::string& k, const char* arg) {
-        cset(k, arg);
-        ++count;
-    }
-
-    void cset(const std::string& k, const char* arg) const {
-        if (!s(arg)) throw option_parse_error(k);
     }
 
     bool has_key(const std::string& arg) const {
@@ -389,6 +339,14 @@ struct option {
         return false;
     }
 };
+
+// Option sets
+// -----------
+//
+// An option_set is a representation of a set of option keys
+// and values, either as returned from to::run or read from
+// some other source to be used to re-create a given set of
+// options.
 
 struct option_set {
     std::vector<std::pair<std::string, std::string>> olist;
@@ -502,6 +460,64 @@ struct option_set {
     }
 };
 
+// Option with mutable state (for checking single and mandatory flags),
+// used by to::run().
+
+struct option_state: option {
+    int count = 0;
+
+    option_state(const option& o): option(o) {}
+
+    maybe<const char*> match(state& st) {
+        if (opt.is_flag) {
+            for (auto& k: keys) {
+                if (st.match_flag(k)) {
+                    set(k.label, nullptr);
+                    return "";
+                }
+            }
+            return nothing;
+        }
+        else if (!opt.keys.empty()) {
+            for (auto& k: opt.keys) {
+                if (auto param = st.match_option(k)) {
+                    set(k.label, param);
+                    return param;
+                }
+            }
+            return nothing;
+        }
+        else {
+            const char* param = *st.argv;
+            st.shift();
+            set("", param);
+            return param;
+        }
+    }
+
+    void set(const std::string& k, const char* arg) {
+        cset(k, arg);
+        ++count;
+    }
+
+    void cset(const std::string& k, const char* arg) const {
+        if (!s(arg)) throw option_parse_error(k);
+    }
+};
+
+// Running a set of options
+// ------------------------
+//
+// to::run() can be used to parse options from the command-line and/or
+// from a saved option_set.
+//
+// The first argument is a collection or sequence of option specifications,
+// followed optionally by command line argc and argv or just argv.
+// A saved option_set can be optionally passed as the last parameter.
+//
+// It returns an option_set comprising the resultant set of (preferred)
+// option keys and values.
+
 template <typename Options>
 option_set run(const Options& options, const option_set& restore = {}) {
     option_set collate;
@@ -520,17 +536,17 @@ option_set run(const Options& options, const option_set& restore = {}) {
 }
 
 template <typename Options>
-option_set run(const Options& options_in, int& argc, char** &argv, const option_set& restore = {}) {
+option_set run(const Options& options, int& argc, char** &argv, const option_set& restore = {}) {
     using std::begin;
     using std::end;
-    std::vector<option> options(begin(options_in), end(options_in));
+    std::vector<option_state> opts(begin(options), end(options));
 
     state st{argc, argv};
     option_set collate = run(options, restore);
 
     while (st) {
         // Try options with a key first.
-        for (option& o: options) {
+        for (auto& o: opts) {
             if (o.is_single && o.count) continue;
             if (o.keys.empty()) continue;
             if (auto ma = o.match(st)) {
@@ -546,7 +562,7 @@ option_set run(const Options& options_in, int& argc, char** &argv, const option_
         }
 
         // Try free options.
-        for (option& o: options) {
+        for (auto& o: opts) {
             if (o.is_single && o.count) continue;
             if (!o.keys.empty()) continue;
             if (auto ma = o.match(st)) {
@@ -561,7 +577,7 @@ option_set run(const Options& options_in, int& argc, char** &argv, const option_
     next: ;
     }
 
-    for (option& o: options) {
+    for (auto& o: opts) {
         if (o.is_mandatory && !o.count) throw missing_mandatory_option(o.prefkey);
     }
 

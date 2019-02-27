@@ -7,32 +7,12 @@
 
 #include <tinyopt/miniopt.h>
 
+#include "mockargs.h"
+
 using namespace std::literals;
 
-struct mockargs {
-    explicit mockargs(const char* argstr) {
-        set(argstr);
-    }
-
-    void set(const char* argstr) {
-        char* p = const_cast<char*>(argstr);
-        args.push_back(p);
-        for (; *p; ) {
-            while (*p++) ;
-            args.push_back(p);
-        }
-        args.back() = 0;
-        argv = args.data();
-        argc = args.size()-1;
-    }
-
-    int argc;
-    char** argv;
-    std::vector<char*> args;
-};
-
 TEST(state, shift) {
-    const char* argstr = "zero\0one\0two\0three\0four\0five\0six\0\0";
+    const char* argstr = "zero\0one\0two\0three\0four\0five\0six\0";
     mockargs M(argstr);
 
     std::vector<char*> v0 = M.args;
@@ -63,7 +43,7 @@ TEST(state, match_long) {
     to::key k("key", to::key::longfmt);
 
     {
-        mockargs M("key\0value\0rest\0\0");
+        mockargs M("key\0value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -72,7 +52,7 @@ TEST(state, match_long) {
     }
 
     {
-        mockargs M("key\0value\0rest\0\0");
+        mockargs M("key\0value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_flag(k);
@@ -81,7 +61,7 @@ TEST(state, match_long) {
     }
 
     {
-        mockargs M("key=value\0rest\0\0");
+        mockargs M("key=value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_flag(k);
@@ -90,7 +70,7 @@ TEST(state, match_long) {
     }
 
     {
-        mockargs M("key=value\0rest\0\0");
+        mockargs M("key=value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -99,7 +79,7 @@ TEST(state, match_long) {
     }
 
     {
-        mockargs M("keyvalue\0rest\0\0");
+        mockargs M("keyvalue\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -112,7 +92,7 @@ TEST(state, match_short) {
     to::key k("key", to::key::shortfmt);
 
     {
-        mockargs M("key\0value\0rest\0\0");
+        mockargs M("key\0value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -121,7 +101,7 @@ TEST(state, match_short) {
     }
 
     {
-        mockargs M("key\0value\0rest\0\0");
+        mockargs M("key\0value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_flag(k);
@@ -130,7 +110,7 @@ TEST(state, match_short) {
     }
 
     {
-        mockargs M("key=value\0rest\0\0");
+        mockargs M("key=value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -139,7 +119,7 @@ TEST(state, match_short) {
     }
 
     {
-        mockargs M("key=value\0rest\0\0");
+        mockargs M("key=value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_flag(k);
@@ -148,7 +128,7 @@ TEST(state, match_short) {
     }
 
     {
-        mockargs M("keyvalue\0rest\0\0");
+        mockargs M("keyvalue\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -161,7 +141,7 @@ TEST(state, match_compact) {
     to::key k("key", to::key::compact);
 
     {
-        mockargs M("key\0value\0rest\0\0");
+        mockargs M("key\0value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -170,7 +150,7 @@ TEST(state, match_compact) {
     }
 
     {
-        mockargs M("key\0value\0rest\0\0");
+        mockargs M("key\0value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_flag(k);
@@ -179,7 +159,7 @@ TEST(state, match_compact) {
     }
 
     {
-        mockargs M("key=value\0rest\0\0");
+        mockargs M("key=value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -188,7 +168,7 @@ TEST(state, match_compact) {
     }
 
     {
-        mockargs M("key=value\0rest\0\0");
+        mockargs M("key=value\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_flag(k);
@@ -197,7 +177,7 @@ TEST(state, match_compact) {
     }
 
     {
-        mockargs M("keyvalue\0rest\0\0");
+        mockargs M("keyvalue\0rest\0");
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
@@ -213,7 +193,7 @@ TEST(state, match_multi_compact) {
     to::key k4("key/four", to::key::compact);
 
     {
-        mockargs M("key/one/three/two\0key/four\0rest\0\0");
+        mockargs M("key/one/three/two\0key/four\0rest\0");
         to::state s(M.argc, M.argv);
 
         EXPECT_TRUE(s.match_flag(k1));

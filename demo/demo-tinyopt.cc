@@ -49,15 +49,15 @@ int main(int argc, char** argv) {
     try {
         char** arg = argv+1;
         while (*arg) {
-            if (apple << to::parse_opt<int>(arg, 'a', "apple") ||
-                banana << to::parse_opt<std::string>(arg, 'b', "banana") ||
-                cranberry << to::parse_opt(arg, 'c', "cranberry") ||
-                date << to::parse_opt<date_kind>(arg, 'd', "date", to::keywords(date_tbl)))
+            if (apple << to::parse<int>(arg, 'a', "apple") ||
+                banana << to::parse<std::string>(arg, 'b', "banana") ||
+                cranberry << to::parse(arg, 'c', "cranberry") ||
+                date << to::parse<date_kind>(arg, 'd', "date", to::keywords(date_tbl)))
             {
                 continue;
             }
 
-            if (to::parse_opt(arg, 'h', "help")) {
+            if (to::parse(arg, 'h', "help")) {
                 to::usage(argv[0], usage_str);
                 return 0;
             }
