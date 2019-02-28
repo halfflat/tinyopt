@@ -76,7 +76,7 @@ TEST(sink, adaptors) {
     EXPECT_EQ((std::vector<double>{1., -1., 1., 3., -5}), vs);
 
     int x = 3;
-    auto a3 = to::set_value(x, 17);
+    auto a3 = to::set(x, 17);
     EXPECT_TRUE(a3(nullptr));
     EXPECT_EQ(17, x);
     x = 2;

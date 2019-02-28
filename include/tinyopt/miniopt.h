@@ -257,21 +257,26 @@ sink push_back(Container& c, P parser = P{}) {
 }
 
 // Set v to value when option parsed; ignore any option parameter.
-template <typename V>
-sink set_value(V& v, V value) {
+template <typename V, typename X>
+sink set(V& v, X value) {
     return action([ref = std::ref(v), value = std::move(value)] { ref.get() = value; });
 }
 
 // Set v to true when option parsed; ignore any option parameter.
 template <typename V>
 sink set(V& v) {
-    return set_value(v, true);
+    return set(v, true);
 }
 
 // Incrememnt v when option parsed; ignore any option parameter.
 template <typename V>
 sink increment(V& v) {
     return action([ref = std::ref(v)] { ++ref.get(); });
+}
+
+template <typename V, typename X>
+sink increment(V& v, X delta) {
+    return action([ref = std::ref(v), delta = std::move(delta)] { ref.get() += delta; });
 }
 
 
@@ -324,13 +329,6 @@ struct option {
         init_(std::forward<Rest>(rest)...);
     }
 
-    // The preferred key is taken as the longest key in the
-    // key set, and is the key used in a parsed option set
-    // (see below).
-    std::string preferred_key() const {
-        return prefkey;
-    }
-
     bool has_key(const std::string& arg) const {
         if (keys.empty() && arg.empty()) return true;
         for (const auto& k: keys) {
@@ -338,24 +336,40 @@ struct option {
         }
         return false;
     }
+
+    void run(const key& k, const char* arg) const {
+        if (!s(arg)) throw option_parse_error(k.label);
+    }
 };
 
-// Option sets
-// -----------
+// Saved options
+// -------------
 //
-// An option_set is a representation of a set of option keys
-// and values, either as returned from to::run or read from
-// some other source to be used to re-create a given set of
-// options.
+// A saved_options structure is a representation of a sequence of successfully
+// parsed options, for the purposes of saving and restoring specified
+// options between application runs.
 
-struct option_set {
-    std::vector<std::pair<std::string, std::string>> olist;
+struct saved_options {
+    // Each parsed option is represented by one or two strings,
+    // being either a flag, an option with empty key, or an option
+    // with non-empty key and its value.
+
+    std::vector<std::pair<std::string, maybe<std::string>>> olist;
 
     decltype(olist.cbegin()) begin() const { return olist.begin(); }
     decltype(olist.cend()) end() const { return olist.end(); }
 
-    void add(const std::string& key, const char* value) {
-        olist.emplace_back(key, value? value: "");
+    void add(std::string s) {
+        olist.emplace_back(std::move(s), nothing);
+    }
+
+    void add(std::string s1, std::string s2) {
+        olist.emplace_back(std::move(s1), std::move(s2));
+    }
+
+    saved_options& operator+=(const saved_options& so) {
+        olist.insert(olist.end(), so.olist.begin(), so.olist.end());
+        return *this;
     }
 
     // Serialized representation:
@@ -366,7 +380,7 @@ struct option_set {
     // a POSIX shell compatabile way, so that they can be used as is from the
     // shell.
 
-    friend std::ostream& operator<<(std::ostream& out, const option_set& s) {
+    friend std::ostream& operator<<(std::ostream& out, const saved_options& s) {
         auto escape = [](const std::string& v) {
             if (v.find_first_of("\\*?[#~=%|^;<>()$'`\" \t\n")==std::string::npos) return v;
 
@@ -381,20 +395,14 @@ struct option_set {
         };
 
         for (auto& p: s.olist) {
-            if (!p.first.empty()) {
-                out << escape(p.first) << ' '
-                    << escape(p.second) << '\n';
-            }
-        }
-        for (auto& p: s.olist) {
-            if (p.first.empty()) {
-                out << escape(p.second) << '\n';
-            }
+            out << escape(p.first);
+            if (p.second) out << ' ' << escape(p.second.value());
+            out << '\n';
         }
         return out;
     }
 
-    friend std::istream& operator>>(std::istream& in, option_set& s) {
+    friend std::istream& operator>>(std::istream& in, saved_options& s) {
         struct parse_state {
             std::string fields[2];
             int i = 0; // Index into fields.
@@ -435,14 +443,8 @@ struct option_set {
                 return !quote;
             };
 
-            void push_option(option_set& s) const {
-                // A single field => key is empty, field is value.
-                if (i==0) {
-                    s.olist.emplace_back("", std::move(fields[0]));
-                }
-                else {
-                    s.olist.emplace_back(std::move(fields[0]), std::move(fields[1]));
-                }
+            void push_option(saved_options& s) const {
+                s.olist.emplace_back(std::move(fields[0]), i? just(std::move(fields[1])): nothing);
             }
         } state;
 
@@ -468,40 +470,34 @@ struct option_state: option {
 
     option_state(const option& o): option(o) {}
 
-    maybe<const char*> match(state& st) {
-        if (opt.is_flag) {
+    // On successful match, return pointers to
+    // matched key and value. For flags, use
+    // nullptr for value.
+
+    maybe<std::pair<const char*, const char*>> match(state& st) {
+        if (is_flag) {
             for (auto& k: keys) {
-                if (st.match_flag(k)) {
-                    set(k.label, nullptr);
-                    return "";
-                }
+                if (st.match_flag(k)) return set(k, nullptr);
             }
             return nothing;
         }
-        else if (!opt.keys.empty()) {
-            for (auto& k: opt.keys) {
-                if (auto param = st.match_option(k)) {
-                    set(k.label, param);
-                    return param;
-                }
+        else if (!keys.empty()) {
+            for (auto& k: keys) {
+                if (auto param = st.match_option(k)) return set(k, param);
             }
             return nothing;
         }
         else {
             const char* param = *st.argv;
             st.shift();
-            set("", param);
-            return param;
+            return set("", param);
         }
     }
 
-    void set(const std::string& k, const char* arg) {
-        cset(k, arg);
+    std::pair<const char*, const char*> set(const key& k, const char* arg) {
+        run(k, arg);
         ++count;
-    }
-
-    void cset(const std::string& k, const char* arg) const {
-        if (!s(arg)) throw option_parse_error(k);
+        return {k.label.c_str(), arg};
     }
 };
 
@@ -509,48 +505,32 @@ struct option_state: option {
 // ------------------------
 //
 // to::run() can be used to parse options from the command-line and/or
-// from a saved option_set.
+// from saved_options data.
 //
 // The first argument is a collection or sequence of option specifications,
 // followed optionally by command line argc and argv or just argv.
-// A saved option_set can be optionally passed as the last parameter.
+// A saved_options object can be optionally passed as the last parameter.
 //
-// It returns an option_set comprising the resultant set of (preferred)
-// option keys and values.
+// It returns a saved_options structure recording the successfully parsed options.
 
 template <typename Options>
-option_set run(const Options& options, const option_set& restore = {}) {
-    option_set collate;
-
-    for (auto& kv: restore) {
-        for (const option& o: options) {
-            if (o.has_key(kv.first)) {
-                o.cset(kv.first, kv.second.c_str());
-                collate.olist.push_back(kv);
-                break;
-            }
-        }
-    }
-
-    return collate;
-}
-
-template <typename Options>
-option_set run(const Options& options, int& argc, char** &argv, const option_set& restore = {}) {
+saved_options run(const Options& options, int& argc, char** argv) {
     using std::begin;
     using std::end;
     std::vector<option_state> opts(begin(options), end(options));
 
+    saved_options collate;
     state st{argc, argv};
-    option_set collate = run(options, restore);
-
     while (st) {
         // Try options with a key first.
         for (auto& o: opts) {
             if (o.is_single && o.count) continue;
             if (o.keys.empty()) continue;
             if (auto ma = o.match(st)) {
-                if (!o.is_ephemeral) collate.olist.emplace_back(o.preferred_key(), ma.value());
+                if (!o.is_ephemeral) {
+                    if (ma->second) collate.add(ma->first, ma->second);
+                    else collate.add(ma->first);
+                }
                 goto next;
             }
         }
@@ -566,28 +546,51 @@ option_set run(const Options& options, int& argc, char** &argv, const option_set
             if (o.is_single && o.count) continue;
             if (!o.keys.empty()) continue;
             if (auto ma = o.match(st)) {
-                if (!o.is_ephemeral) collate.olist.emplace_back("", ma.value());
+                if (!o.is_ephemeral) collate.add(ma->second);
                 goto next;
             }
         }
 
         // Nothing matched, so increment argv.
         st.skip();
-
     next: ;
     }
 
     for (auto& o: opts) {
         if (o.is_mandatory && !o.count) throw missing_mandatory_option(o.prefkey);
     }
-
     return collate;
 }
 
 template <typename Options>
-option_set run(const Options& options, char** &argv, const option_set& restore = {}) {
+saved_options run(const Options& options, const saved_options& restore) {
+    std::vector<char*> args;
+
+    for (auto& entry: restore) {
+        args.push_back(const_cast<char*>(entry.first.c_str()));
+        if (entry.second) args.push_back(const_cast<char*>(entry.second->c_str()));
+    }
+    args.push_back(nullptr);
+
+    int ignore_argc = 0;
+    return run(options, ignore_argc, args.data());
+}
+
+template <typename Options>
+saved_options run(const Options& options, int& argc, char** argv, const saved_options& restore) {
+    auto collate = run(options, restore);
+    return collate += run(options, argc, argv);
+}
+
+template <typename Options>
+saved_options run(const Options& options, char** argv) {
+    int ignore_argc = 0;
+    return run(options, ignore_argc, argv);
+}
+
+template <typename Options>
+saved_options run(const Options& options, char** argv, const saved_options& restore) {
     int ignore_argc = 0;
     return run(options, ignore_argc, argv, restore);
 }
-
 } // namespace to

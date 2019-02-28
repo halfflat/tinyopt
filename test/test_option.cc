@@ -89,29 +89,29 @@ TEST(option, ctor) {
     EXPECT_EQ((svec{}), key_labels(opts[4]));
 }
 
-TEST(option, set) {
+TEST(option, run) {
     using namespace to::literals;
     int a, b, c, d;
     std::string e;
 
-    to::option opt_a{a, to::ephemeral, to::single, "-a", "--arg"};
-    ASSERT_NO_THROW(opt_a.set("-a", "3"));
+    to::option opt_a{a, to::single, "-a", "--arg"};
+    ASSERT_NO_THROW(opt_a.run("-a", "3"));
     EXPECT_EQ(a, 3);
-    ASSERT_THROW(opt_a.set("-a", "fish"), to::option_parse_error);
+    ASSERT_THROW(opt_a.run("-a", "fish"), to::option_parse_error);
 
     c = 1;
     to::option opt_c{to::increment(c), to::flag, "-c", "--cat"};
-    ASSERT_NO_THROW(opt_c.set("-c", nullptr));
+    ASSERT_NO_THROW(opt_c.run("-c", nullptr));
     EXPECT_EQ(c, 2);
 
     d = 3;
     to::option opt_d{to::action([&d](int) {++d;}), "-d"_compact};
-    ASSERT_NO_THROW(opt_d.set("-d", "7"));
+    ASSERT_NO_THROW(opt_d.run("-d", "7"));
     EXPECT_EQ(d, 4);
-    ASSERT_THROW(opt_d.set("-d", "fish"), to::option_parse_error);
+    ASSERT_THROW(opt_d.run("-d", "fish"), to::option_parse_error);
 
     to::option opt_e{e};
-    ASSERT_NO_THROW(opt_e.set("", "bauble"));
+    ASSERT_NO_THROW(opt_e.run("", "bauble"));
     EXPECT_EQ("bauble", e);
 }
 

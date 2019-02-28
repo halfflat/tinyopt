@@ -46,6 +46,7 @@ struct maybe {
     T&& value() && { return assert_ok(), std::move(*vptr()); }
 
     const T& operator*() const & noexcept { return *vptr(); }
+    const T* operator->() const & noexcept { return vptr(); }
     T&& operator*() && { return std::move(*vptr()); }
     operator bool() const noexcept { return ok; }
 
