@@ -1,7 +1,7 @@
 #include <fstream>
 #include <utility>
 
-#include <tinyopt/miniopt.h>
+#include <tinyopt/smolopt.h>
 
 // Parse command line options as:
 //   -a              Increment count of 'a'.
@@ -54,6 +54,7 @@ int main(int argc, char** argv) {
     };
 
     auto allopts = to::run(options, argc, argv+1, restore);
+    if (!allopts) return 0;
 
     std::cout << "unparsed arguments:";
     for (auto a = argv+1; *a; ++a) std::cout << " '" << *a << "'";
@@ -75,6 +76,6 @@ int main(int argc, char** argv) {
 
     if (save) {
         std::ofstream saved("saved.opt");
-        saved << allopts;
+        saved << *allopts;
     }
 }

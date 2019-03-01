@@ -40,11 +40,6 @@ struct missing_argument: option_error {
         option_error("option misssing argument", arg) {}
 };
 
-struct unrecognized_option: option_error {
-    unrecognized_option(const std::string &arg):
-        option_error("unrecognized option", arg) {}
-};
-
 // `usage` prints usage information to stdout (no error message)
 // or to stderr (with error message). It extracts the program basename
 // from the provided argv[0] string.

@@ -1,5 +1,7 @@
 #pragma once
 
+// Small option parsing/handling, but no so teeny as tinyopt.
+
 #include <cstddef>
 #include <cstring>
 #include <functional>
@@ -14,28 +16,25 @@ namespace to {
 // Option keys
 // -----------
 //
-// A key is how the option is specified in an argument list,
-// and is typically represented as a 'short' (e.g. '-a')
-// option or a 'long' option (e.g. '--apple').
+// A key is how the option is specified in an argument list, and is typically
+// represented as a 'short' (e.g. '-a') option or a 'long' option (e.g.
+// '--apple').
 //
-// The value for an option can always be taken from the
-// next argument in the list, but in addition can be specified
-// together with the key itself, depending on the properties
-// of the option key:
+// The value for an option can always be taken from the next argument in the
+// list, but in addition can be specified together with the key itself,
+// depending on the properties of the option key:
 //
 //     --key=value         'Long' style argument for key "--key"
 //     -kvalue             'Compact' style argument for key "-k"
 //
-// Compact option keys can be combined in the one item in
-// the argument list, if the options do not take any values
-// (that is, they are flags). For example, if -a, -b are flags
-// and -c takes an integer argument, with all three keys marked
-// as compact, then an item '-abc3' in the argument list
-// will be parsed in the same way as the sequence of items
-// '-a', '-b', '-c', '3'.
+// Compact option keys can be combined in the one item in the argument list, if
+// the options do not take any values (that is, they are flags). For example,
+// if -a, -b are flags and -c takes an integer argument, with all three keys
+// marked as compact, then an item '-abc3' in the argument list will be parsed
+// in the same way as the sequence of items '-a', '-b', '-c', '3'.
 //
-// An option without a key will match any item in the argument
-// list; options with keys are always checked first.
+// An option without a key will match any item in the argument list; options
+// with keys are always checked first.
 
 struct key {
     std::string label;
@@ -70,10 +69,9 @@ inline key operator""_compact(const char* label, std::size_t) {
 // Argument state
 // --------------
 //
-// to::state represents the collection of command line arguments.
-// Mutating operations (shift(), successful option matching, etc.)
-// will modify the underlying set of arguments used to construct the
-// state object.
+// to::state represents the collection of command line arguments. Mutating
+// operations (shift(), successful option matching, etc.) will modify the
+// underlying set of arguments used to construct the state object.
 
 struct state {
     int& argc;
@@ -91,7 +89,9 @@ struct state {
         while (*skip && n) ++skip, --n;
 
         argc -= (skip-argv);
-        for (auto p = argv; *p; *p++ = *skip++) ;
+        auto p = argv;
+        do { *p++ = *skip; } while (*skip++);
+
         optoff = 0;
     }
 
@@ -168,13 +168,13 @@ struct state {
 // Sinks and actions
 // -----------------
 //
-// Sinks wrap a function that takes a pointer to an option parameter and
-// stores or acts upon the parsed result.
+// Sinks wrap a function that takes a pointer to an option parameter and stores
+// or acts upon the parsed result.
 //
-// They can be constructed from an lvalue reference or a functional
-// object (via the `action` function) with or without an explicit parser
-// function. If no parser is given, a default one is used if the correct
-// value type can be determined.
+// They can be constructed from an lvalue reference or a functional object (via
+// the `action` function) with or without an explicit parser function. If no
+// parser is given, a default one is used if the correct value type can be
+// determined.
 
 namespace impl {
     template <typename T> struct fn_arg_type { using type = void; };
@@ -229,7 +229,7 @@ template <typename F, typename A = unary_argument_type_t<F>>
 sink action(F f) {
     return sink(sink::action,
         [f = std::move(f)](const char* arg) -> bool {
-            return f << default_parser<A>{}(arg);
+            return static_cast<bool>(f << default_parser<A>{}(arg));
         });
 }
 
@@ -237,16 +237,15 @@ template <typename F, typename P>
 sink action(F f, P parser) {
     return sink(sink::action,
         [f = std::move(f), parser = std::move(parser)](const char* arg) -> bool {
-            return f << parser(arg);
+            return static_cast<bool>(f << parser(arg));
         });
 }
 
 // Sink adaptors:
 //
-// These adaptors constitute short cuts for making actions that
-// count the occurance of a flag, set a fixed value when a flag
-// is provided, or for appending an option parameter onto a vector
-// of values.
+// These adaptors constitute short cuts for making actions that count the
+// occurance of a flag, set a fixed value when a flag is provided, or for
+// appending an option parameter onto a vector of values.
 
 // Push parsed option parameter on to container.
 template <typename Container, typename P = default_parser<typename Container::value_type>>
@@ -293,7 +292,8 @@ enum option_flag {
     flag = 1,       // Option takes no parameter.
     ephemeral = 2,  // Option is not saved in returned results.
     single = 4,     // Option is parsed at most once.
-    mandatory = 8   // Option must be present in argument list.
+    mandatory = 8,  // Option must be present in argument list.
+    exit = 16,      // Option stops further argument processing.
 };
 
 struct option {
@@ -305,6 +305,7 @@ struct option {
     bool is_ephemeral = false;
     bool is_single = false;
     bool is_mandatory = false;
+    bool is_exit = false;
 
     template <typename... Rest>
     option(sink s, Rest&&... rest): s(std::move(s)) {
@@ -319,6 +320,7 @@ struct option {
         is_ephemeral |= f & ephemeral;
         is_single    |= f & single;
         is_mandatory |= f & mandatory;
+        is_exit      |= f & exit;
         init_(std::forward<Rest>(rest)...);
     }
 
@@ -338,6 +340,7 @@ struct option {
     }
 
     void run(const key& k, const char* arg) const {
+        if (!is_flag && !arg) throw missing_argument(k.label);
         if (!s(arg)) throw option_parse_error(k.label);
     }
 };
@@ -345,119 +348,108 @@ struct option {
 // Saved options
 // -------------
 //
-// A saved_options structure is a representation of a sequence of successfully
-// parsed options, for the purposes of saving and restoring specified
-// options between application runs.
+// Successfully matched options, excluding those with the to::ephemeral flag
+// set, are collated in a saved_options structure for potential documentation
+// or replay.
 
-struct saved_options {
-    // Each parsed option is represented by one or two strings,
-    // being either a flag, an option with empty key, or an option
-    // with non-empty key and its value.
+struct saved_options: private std::vector<std::string> {
+    using std::vector<std::string>::begin;
+    using std::vector<std::string>::end;
+    using std::vector<std::string>::size;
+    using std::vector<std::string>::empty;
 
-    std::vector<std::pair<std::string, maybe<std::string>>> olist;
-
-    decltype(olist.cbegin()) begin() const { return olist.begin(); }
-    decltype(olist.cend()) end() const { return olist.end(); }
-
-    void add(std::string s) {
-        olist.emplace_back(std::move(s), nothing);
-    }
-
-    void add(std::string s1, std::string s2) {
-        olist.emplace_back(std::move(s1), std::move(s2));
-    }
+    void add(std::string s) { push_back(std::move(s)); }
 
     saved_options& operator+=(const saved_options& so) {
-        olist.insert(olist.end(), so.olist.begin(), so.olist.end());
+        insert(end(), so.begin(), so.end());
         return *this;
+    }
+
+    struct arglist {
+        int argc;
+        char** argv;
+        std::vector<char*> arg_data;
+    };
+
+    // Construct argv representing argument list.
+    arglist as_arglist() const {
+        arglist A;
+
+        for (auto& a: *this) A.arg_data.push_back(const_cast<char*>(a.c_str()));
+        A.arg_data.push_back(nullptr);
+        A.argv = A.arg_data.data();
+        A.argc = A.arg_data.size()-1;
+        return A;
     }
 
     // Serialized representation:
     //
-    // Option entries separated by new lines, each option given as key then
-    // value separated by white space (if there is a key) or simply value (if
-    // the key is empty). The keys and values are escaped with single quotes in
-    // a POSIX shell compatabile way, so that they can be used as is from the
-    // shell.
+    // Saved arguments are separated by white space. If an argument
+    // contains whitespace or a special character, it is escaped with
+    // single quotes in a POSIX shell compatible fashion, so that
+    // the representation can be used directly on a shell command line.
 
     friend std::ostream& operator<<(std::ostream& out, const saved_options& s) {
         auto escape = [](const std::string& v) {
-            if (v.find_first_of("\\*?[#~=%|^;<>()$'`\" \t\n")==std::string::npos) return v;
+            if (!v.empty() && v.find_first_of("\\*?[#~=%|^;<>()$'`\" \t\n")==std::string::npos) return v;
 
             // Wrap string in single quotes, replacing any internal single quote
             // character with: '\''
 
             std::string q ="'";
             for (auto c: v) {
-                q += c=='\''? "'\\''": v;
+                c=='\''? q += "'\\''": q += c;
             }
-            return q;
+            return q += '\'';
         };
 
-        for (auto& p: s.olist) {
-            out << escape(p.first);
-            if (p.second) out << ' ' << escape(p.second.value());
-            out << '\n';
+        bool first = true;
+        for (auto& p: s) {
+            if (first) first = false; else out << ' ';
+            out << escape(p);
         }
         return out;
     }
 
     friend std::istream& operator>>(std::istream& in, saved_options& s) {
-        struct parse_state {
-            std::string fields[2];
-            int i = 0; // Index into fields.
-            bool ws = false; // true => in whitespace between fields.
-            bool quote = false; // true => within single quotes.
-            bool escape = false; // true => previous character was backslash.
+        std::string w;
+        bool have_word = false;
+        bool quote = false; // true => within single quotes.
+        bool escape = false; // true => previous character was backslash.
+        while (in) {
+            char c = in.get();
+            if (c==EOF) break;
 
-            // Returns true if parsing of a record is complete, viz. st.quote is false.
-            bool parse_line(const std::string &line) {
-                for (auto c: line) {
-                    if (ws) {
-                        if (c==' ' || c=='\t' || c=='\n') continue;
-                        ws = false;
-                        i = 1;
-                    }
-
-                    if (quote) {
-                        if (c!='\'') fields[i] += c;
-                        else quote = false;
-                    }
-                    else {
-                        if (escape) {
-                            fields[i] += c;
-                            escape = false;
-                        }
-                        else if (c=='\\') {
-                            escape = true;
-                        }
-                        else if (c=='\'') {
-                            quote = true;
-                        }
-                        else if (c==' ' || c=='\t' || c=='\n') {
-                            ws = true;
-                        }
-                        else fields[i]+=c;
-                    }
-                }
-                return !quote;
-            };
-
-            void push_option(saved_options& s) const {
-                s.olist.emplace_back(std::move(fields[0]), i? just(std::move(fields[1])): nothing);
+            if (quote) {
+                if (c!='\'') w += c;
+                else quote = false;
             }
-        } state;
-
-        for (std::string line; std::getline(in, line); ) {
-            if (state.parse_line(line)) {
-                state.push_option(s);
-                state = parse_state{};
+            else {
+                if (escape) {
+                    w += c;
+                    escape = false;
+                }
+                else if (c=='\\') {
+                    escape = true;
+                    have_word = true;
+                }
+                else if (c=='\'') {
+                    quote = true;
+                    have_word = true;
+                }
+                else if (c!=' ' && c!='\t' && c!='\n') {
+                    w += c;
+                    have_word = true;
+                }
+                else {
+                    if (have_word) s.add(w);
+                    have_word = false;
+                    w = "";
+                }
             }
         }
 
-        // If last line has an open quote, parse charitably.
-        if (state.quote) state.push_option(s);
-
+        if (have_word) s.add(w);
         return in;
     }
 };
@@ -470,10 +462,8 @@ struct option_state: option {
 
     option_state(const option& o): option(o) {}
 
-    // On successful match, return pointers to
-    // matched key and value. For flags, use
-    // nullptr for value.
-
+    // On successful match, return pointers to matched key and value.
+    // For flags, use nullptr for value.
     maybe<std::pair<const char*, const char*>> match(state& st) {
         if (is_flag) {
             for (auto& k: keys) {
@@ -504,33 +494,38 @@ struct option_state: option {
 // Running a set of options
 // ------------------------
 //
-// to::run() can be used to parse options from the command-line and/or
-// from saved_options data.
+// to::run() can be used to parse options from the command-line and/or from
+// saved_options data.
 //
 // The first argument is a collection or sequence of option specifications,
-// followed optionally by command line argc and argv or just argv.
-// A saved_options object can be optionally passed as the last parameter.
+// followed optionally by command line argc and argv or just argv. A
+// saved_options object can be optionally passed as the last parameter.
 //
-// It returns a saved_options structure recording the successfully parsed options.
+// If an option with the to::exit flag is matched, option parsing will
+// immediately stop and an empty value will be returned. Otherwise to::run()
+// will return a saved_options structure recording the successfully parsed
+// options.
 
 template <typename Options>
-saved_options run(const Options& options, int& argc, char** argv) {
+maybe<saved_options> run(const Options& options, int& argc, char** argv) {
     using std::begin;
     using std::end;
     std::vector<option_state> opts(begin(options), end(options));
 
     saved_options collate;
+    bool exit = false;
     state st{argc, argv};
-    while (st) {
+    while (st && !exit) {
         // Try options with a key first.
         for (auto& o: opts) {
             if (o.is_single && o.count) continue;
             if (o.keys.empty()) continue;
             if (auto ma = o.match(st)) {
                 if (!o.is_ephemeral) {
-                    if (ma->second) collate.add(ma->first, ma->second);
-                    else collate.add(ma->first);
+                    collate.add(ma->first);
+                    if (ma->second) collate.add(ma->second);
                 }
+                exit = o.is_exit;
                 goto next;
             }
         }
@@ -547,6 +542,7 @@ saved_options run(const Options& options, int& argc, char** argv) {
             if (!o.keys.empty()) continue;
             if (auto ma = o.match(st)) {
                 if (!o.is_ephemeral) collate.add(ma->second);
+                exit = o.is_exit;
                 goto next;
             }
         }
@@ -556,6 +552,8 @@ saved_options run(const Options& options, int& argc, char** argv) {
     next: ;
     }
 
+    if (exit) return nothing;
+
     for (auto& o: opts) {
         if (o.is_mandatory && !o.count) throw missing_mandatory_option(o.prefkey);
     }
@@ -563,33 +561,31 @@ saved_options run(const Options& options, int& argc, char** argv) {
 }
 
 template <typename Options>
-saved_options run(const Options& options, const saved_options& restore) {
-    std::vector<char*> args;
+maybe<saved_options> run(const Options& options, const saved_options& restore) {
+    auto A = restore.as_arglist();
+    return run(options, A.argc, A.argv);
+}
 
-    for (auto& entry: restore) {
-        args.push_back(const_cast<char*>(entry.first.c_str()));
-        if (entry.second) args.push_back(const_cast<char*>(entry.second->c_str()));
+template <typename Options>
+maybe<saved_options> run(const Options& options, int& argc, char** argv, const saved_options& restore) {
+    saved_options coll1, coll2;
+
+    if (coll1 << run(options, restore) && coll2 << run(options, argc, argv)) {
+        coll1 += coll2;
+        return coll1;
     }
-    args.push_back(nullptr);
 
-    int ignore_argc = 0;
-    return run(options, ignore_argc, args.data());
+    return nothing;
 }
 
 template <typename Options>
-saved_options run(const Options& options, int& argc, char** argv, const saved_options& restore) {
-    auto collate = run(options, restore);
-    return collate += run(options, argc, argv);
-}
-
-template <typename Options>
-saved_options run(const Options& options, char** argv) {
+maybe<saved_options> run(const Options& options, char** argv) {
     int ignore_argc = 0;
     return run(options, ignore_argc, argv);
 }
 
 template <typename Options>
-saved_options run(const Options& options, char** argv, const saved_options& restore) {
+maybe<saved_options> run(const Options& options, char** argv, const saved_options& restore) {
     int ignore_argc = 0;
     return run(options, ignore_argc, argv, restore);
 }

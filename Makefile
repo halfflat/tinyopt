@@ -1,20 +1,15 @@
-.PHONY: clean all
+.PHONY: clean all examples
 .SECONDARY:
 
 top:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-all:: demo-tinyopt demo-miniopt unit
+examples:=ex1-tiny ex1-smol ex4-smol demo-tinyopt demo-miniopt
+all:: unit $(examples)
 
-demo-tinyopt-src:=demo-tinyopt.cc
-demo-tinyopt-obj:=$(patsubst %.cc, %.o, $(demo-tinyopt-src))
+test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc test_parse.cc test_saved_options.cc
 
-demo-miniopt-src:=demo-miniopt.cc
-demo-miniopt-obj:=$(patsubst %.cc, %.o, $(demo-miniopt-src))
-
-test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc test_parse.cc
-test-obj:=$(patsubst %.cc, %.o, $(test-src))
-
-depends:=$(patsubst %.cc, %.d, $(demo-miniopt-src) $(demo-tinyopt-src) $(test-src)) gtest.d
+all-src:=$(test-src) $(patsubst %, %.cc, $(examples))
+all-obj:=$(patsubst %.cc, %.o, $(all-src))
 
 gtest-top:=$(top)test/googletest/googletest
 gtest-inc:=$(gtest-top)/include
@@ -22,29 +17,41 @@ gtest-src:=$(gtest-top)/src/gtest-all.cc
 
 vpath %.cc $(top)test
 vpath %.cc $(top)demo
+vpath %.cc $(top)ex
 
 #OPTFLAGS?=-O3 -march=native
 OPTFLAGS?=-O0 -fsanitize=address
 CXXFLAGS+=$(OPTFLAGS) -MMD -MP -std=c++14 -g -pthread
 CPPFLAGS+=-isystem $(gtest-inc) -I $(top)include
 
+depends:=$(patsubst %.cc, %.d, $(all-src)) gtest.d
 -include $(depends)
 
 gtest.o: CPPFLAGS+=-I $(gtest-top)
 gtest.o: ${gtest-src}
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $<
 
+test-obj:=$(patsubst %.cc, %.o, $(test-src))
 unit: $(test-obj) gtest.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-demo-miniopt: $(demo-miniopt-obj)
+demo-miniopt: demo-miniopt.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-demo-tinyopt: $(demo-tinyopt-obj)
+demo-tinyopt: demo-tinyopt.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+ex1-tiny: ex1-tiny.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+ex1-smol: ex1-smol.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+ex4-smol: ex4-smol.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 clean:
-	rm -f $(demo-tinyopt-obj) $(demo-miniopt-obj) $(test-obj)
+	rm -f $(all-obj)
 
 realclean: clean
-	rm -f demo-tinyopt demo-miniopt unit gtest.o $(depends)
+	rm -f demo-tinyopt demo-miniopt unit $(examples) gtest.o $(depends)

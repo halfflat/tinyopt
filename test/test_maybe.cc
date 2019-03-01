@@ -7,9 +7,11 @@ using namespace to;
 TEST(maybe, something) {
     constexpr auto s = something;
     EXPECT_TRUE(s);
+    EXPECT_TRUE(s.has_value());
 
     constexpr auto n = nothing;
     EXPECT_FALSE(maybe<int>(nothing));
+    EXPECT_FALSE(maybe<int>(nothing).has_value());
 }
 
 TEST(maybe, noexcept) {
@@ -79,6 +81,16 @@ TEST(maybe, conditional_assign) {
 
     EXPECT_FALSE(r << maybe<int>());
     EXPECT_EQ(5, r);
+}
+
+TEST(maybe, conditional_void_assign) {
+    int r = 0;
+
+    EXPECT_TRUE(r << something);
+    EXPECT_EQ(1, r);
+
+    EXPECT_FALSE(r << maybe<void>());
+    EXPECT_EQ(1, r);
 }
 
 TEST(maybe, conditional_apply) {

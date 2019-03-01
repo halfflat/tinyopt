@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
                 return 0;
             }
 
-            if (*arg[0]=='-') throw to::unrecognized_option(*arg);
+            if (*arg[0]=='-') throw to::option_error(*arg, "unrecognized option");
             remaining.push_back(*arg++);
         }
 

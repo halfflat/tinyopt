@@ -48,7 +48,9 @@ struct maybe {
     const T& operator*() const & noexcept { return *vptr(); }
     const T* operator->() const & noexcept { return vptr(); }
     T&& operator*() && { return std::move(*vptr()); }
-    operator bool() const noexcept { return ok; }
+
+    bool has_value() const noexcept { return ok; }
+    explicit operator bool() const noexcept { return ok; }
 
 private:
     T* vptr() noexcept { return reinterpret_cast<T*>(data); }
@@ -97,7 +99,8 @@ struct maybe<void> {
     template <typename U>
     maybe& operator=(U&& v) noexcept { return ok = true, *this; }
 
-    constexpr operator bool() const noexcept { return ok; }
+    bool has_value() const noexcept { return ok; }
+    constexpr explicit operator bool() const noexcept { return ok; }
 };
 
 // something is a non-empty maybe<void> value.
@@ -160,4 +163,8 @@ auto operator<<(T& x, const maybe<U>& m) -> maybe<std::decay_t<decltype(x=*m)>> 
     if (m) return x=*m; else return nothing;
 }
 
+template <typename T>
+auto operator<<(T& x, const maybe<void>& m) -> maybe<std::decay_t<decltype(x=true)>> {
+    if (m) return x=true; else return nothing;
+}
 } // namespace to

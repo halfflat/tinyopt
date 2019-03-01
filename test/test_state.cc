@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include <tinyopt/miniopt.h>
+#include <tinyopt/smolopt.h>
 
 #include "mockargs.h"
 

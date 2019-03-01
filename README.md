@@ -11,9 +11,9 @@ which is also kinda huge.
 So this project constitutes yet another header-only option parsing library.
 Actually, two. `tinyopt` is quite minimal: all it does is handle the
 problem of matching and parsing an option specification; user code
-iterates through the argument list itself. `miniopt` aims to answer
+iterates through the argument list itself. `smolopt` aims to answer
 demands from another project where it was deemed that `tiyopt` was
-too tiny, and does much more of the heavy lifting.
+in fact too tiny, and so does much more of the heavy lifting.
 
 Design goals:
 
@@ -24,8 +24,8 @@ Design goals:
 Features:
 
 * Support 'short' and 'long' style arguments: `-v 3` and `--value=3`.
-* [`miniopt` only] Support 'compact' bunching of arguments: `-abc 3` vs `-a -b -c 3`.
-* [`miniopt` only] Save and restore options and arguments in a shell-compatible format,
+* [`smolopt` only] Support 'compact' bunching of arguments: `-abc 3` vs `-a -b -c 3`.
+* [`smolopt` only] Save and restore options and arguments in a shell-compatible format,
   allowing e.g. `program `cat previous-options` --foo=bar`.
 
 Non-features:
@@ -42,7 +42,28 @@ Non-features:
   This also, can require arbitrarily complex support in any library,
   where instead it can be handled much more easily user side.
 
+## Building
+
+Tinyopt/smolopt is a header-only library, but the supplied
+Makefile will build the unit tests and examples.
+
+The Makefile is designed to support out-of-tree building, and the recommended
+approach is to create a build directory, symbolicly link the project Makefile
+into the directory, and build from there. For example, to check out, build the
+tests and examples, and then run the unit tests:
+```
+    % git clone git@github.com:halfflat/tinyopt
+    % cd tinyopt
+    % mkdir build
+    % cd build
+    % ln -s ../Makefile .
+    % make
+    % ./unit
+```
+
 ## Simple examples
+
+More examples are found in the `ex/` subdirectory.
 
 `tinyopt` code for parsing options three options, one numeric,
 one a keyword from a table, and one just a flag.
@@ -56,90 +77,89 @@ const char* usage_str =
     "[OPTION]...\n"
     "\n"
     "  -n, --number=N       Specify N\n"
-    "  -a, --action=ACTION  Do ACTION, which is one of: one, two\n"
+    "  -f, --function=FUNC  Perform FUNC, which is one of: one, two\n"
     "  -h, --help           Display usage information and exit\n";
 
 int main(int argc, char** argv) {
-    using to::parse_opt;
     try {
-	int n = 0, action = 0;
+	int n = 0, fn = 0;
 	bool help = false;
 
-	std::pair<std::string, int> actions[] = {
-	    { "one", 1 }, { "two", 2}
+	std::pair<const char*, int> functions[] = {
+	    { "one", 1 }, { "two", 2 }
 	};
 
 	for (auto arg = argv+1; *arg; ) {
-	    help   << parse_opt<>(arg, 'h', "help") ||
-	    n      << parse_opt<int>(arg, 'n', "number") ||
-	    action << parse_opt<int>(arg, 'a', "action", keywords(actions)) ||
-	    throw to::parse_opt_error(arg, "unrecognized argument");
+            bool ok =
+	        help << to::parse(arg, 'h', "help") ||
+	        n    << to::parse<int>(arg, 'n', "number") ||
+	        fn   << to::parse<int>(arg, 'f', "function", to::keywords(functions));
+
+	    if (!ok) throw to::option_error("unrecognized argument", *arg);
 	}
 
-	if (n<1) throw to::parse_opt_error(arg, "N must be at least 1");
-	if (action<1) throw to::parse_opt_error(arg, "Require ACTION");
 	if (help) {
 	    to::usage(argv[0], usage_str);
 	    return 0;
 	}
 
+	if (n<1) throw to::option_error("N must be at least 1");
+	if (fn<1) throw to::option_error("Require FUNC");
+
 	// Do things with arguments:
 
 	for (int i = 0; i<n; ++i) {
-	    std::cout << "Doing action #" << action << "\n";
+	    std::cout << "Performing function #" << fn << "\n";
 	}
     }
-    catch (to::parse_opt_error& e) {
+    catch (to::option_error& e) {
 	to::usage(argv[0], usage_str, e.what());
 	return 1;
     }
 }
 ```
 
-Equivalent `miniopt` code.
+Equivalent `smolopt` code.
 ```
 #include <string>
 #include <utility>
-#include <tinyopt/tinyopt.h>
+#include <tinyopt/smolopt.h>
 
 const char* usage_str =
     "[OPTION]...\n"
     "\n"
     "  -n, --number=N       Specify N\n"
-    "  -a, --action=ACTION  Do ACTION, which is one of: one, two\n"
+    "  -f, --function=FUNC  Perform FUNC, which is one of: one, two\n"
     "  -h, --help           Display usage information and exit\n";
 
 int main(int argc, char** argv) {
     try {
-	int n = 0, action = 0;
-	bool help = false;
+	int n = 0, fn = 0;
 
-	std::pair<std::string, int> actions[] = {
-	    { "one", 1 }, { "two", 2}
+	std::pair<const char*, int> functions[] = {
+	    { "one", 1 }, { "two", 2 }
 	};
+
+        auto help = [argv0 = argv[0]] { to::usage(argv0, usage_str); };
 
 	to::option opts[] = {
 	    { n, "-n", "--number" },
-	    { action, keywords(actions), "-a", "--action", to::mandatory },
-	    { help, to::flag, "-h", "--help" }
+	    { {fn, to::keywords(functions)}, "-f", "--function", to::mandatory },
+	    { to::action(help), to::flag, to::exit, "-h", "--help" }
 	};
 
-	to::run(opts, argc, argv);
+	if (!to::run(opts, argc, argv)) return 0;
 
-	if (argv[1]) throw to::parse_opt_error(argv[1], "unrecogonized argument");
-	if (n<1) throw to::parse_opt_error(arg, "N must be at least 1");
-	if (help) {
-	    to::usage(argv[0], usage_str);
-	    return 0;
-	}
+	if (argv[1]) throw to::option_error("unrecogonized argument", argv[1]);
+	if (n<1) throw to::option_error("N must be at least 1");
 
 	// Do things with arguments:
 
 	for (int i = 0; i<n; ++i) {
-	    std::cout << "Doing action #" << action << "\n";
+	    std::cout << "Performing function #" << fn << "\n";
 	}
     }
-    catch (to::parse_opt_error& e) {
+    catch (to::option_error& e) {
 	to::usage(argv[0], usage_str, e.what());
 	return 1;
     }
@@ -151,7 +171,7 @@ int main(int argc, char** argv) {
 All tinyopt and miniopt code lives in the namespace `to`. This namespace
 is omitted in the descriptions below.
 
-Common classes and helpers:
+### Common classes and helpers:
 
 #### `template <typename V> struct maybe`
 
@@ -179,12 +199,15 @@ is a pre-defined non-empty `maybe<void>`.
   `f << m` has type `maybe<V>` and contains `f(*m)` if `m` has a value.
 * And similarly for `maybe<void>` and functions `V f()`.
 
-#### `parse_opt_error`
+#### `option_error`
 
 An exception class derived from `std::runtime_error`. It has two constructors:
-* `parse_opt_error(const std::string&)` simply sets the what string to the argument.
-* `parse_opt_error(const char* arg, const std::string& s)` sets the what string to
-  the value of `arg+":"+s`.
+* `option_error(const std::string&)` simply sets the what string to the argument.
+* `option_error(const std::string& message, const std::string& arg)` sets the what string to
+   the value of `arg+": "+mesage`.
+
+The option parsers can throw exceptions derived from `option_error`, namely:
+`option_parse_error`, `missing_mandatory_option`, and `missing_argument`.
 
 #### `usage(const char *argv0, const std::string& usagemsg)`
 
@@ -197,6 +220,41 @@ Extract a program name from `argv0` (everything after the last '/' if present) a
 print a message to standard error in the form
 "<program-name>: <error>\nUsage: <program-name> <usagemsg>\n".
 
+### Parsers
+
+A parser is a function or functional object with signature `maybe<X> (const char*)`
+for some type `X`. They are used to try to convert a C-string argument into a value.
+
+If no explicit parser is given to a tinyopt `parse` function or to a smolopt `option`,
+the default parser `default_parser` is used, which will use `std::istream::operator>>`
+to read the supplied argument.
+
+Tinyopt supplies additional parsers:
+
+* `keyword_parser<V>`
+
+   Constructed from a table of key-value pairs, the `keyword_parser<V>` parser
+   will return the first value found in the table with matching key, or `nothing`
+   if there is no match.
+
+   The `keywords(pairs)` function constructs a `keyword_parser<V>` object from the
+   collection of keyword pairs `pairs`, where each element in the collection is
+   a `std::pair` or `std::tuple`. The first component of each pair is used
+   to construct the `std::string` key in the keyword table, and the second the
+   value. The value type `V` is deduced from this second component.
+
+* `delimited_parser<P>`
+
+   The delimited parser uses another parser of type `P` to parse individual
+   elements in a delimited sequence, and returns a `std::vector` of the
+   corresponding values.
+
+   The convenience constructor `delimited<V>(char delim = ',')` will make
+   a `delimited_parser` using the default parser for `V` and delimiter
+   `delim` (by default, a comma).
+
+   `delimited(char delim, P&& parser)` is a convenience wrapper for
+   `delimited_parser<P>::delimited_parser(delim, parser)`.
 
 ### Tinyopt
 
@@ -207,4 +265,28 @@ Tinyopt makes some strong assumptions about valid option names:
   For example, for an option with short name 'a' and long name "apple", all of the following are equivalent ways to specify the argument:
   `-a 3`, `--apple=3`, `--apple 3`.
 
-### Miniopt
+Tinyopt provides one (overloaded) function for option parsing, `parse`.
+* `maybe<void> parse(char**& argp, char shortopt, const char* longopt = nullptr)`
+
+   Attempt to parse an option with no argument (i.e. a flag) at `argp`, given by
+   the short option `shortopt` (if not NUL) or the long option `longopt` (if not
+   a null pointer). Returns an empty `maybe<void>` value if it fails to match
+   the option.
+
+   If the match is successful, increment `argp` to point to the next argument.
+
+* `maybe<V> parse(char**& argp, char shortopt, const char* longopt = nullptr, constr P& parser = P{})`
+
+   Attempt to parse an option with an argument to be interpreted as type `V`,
+   using the short and long option names as above. If no `parser` is supplied,
+   the default parser for `V` is used. 
+
+The `parse` functions will throw `missing_argument` if no argument is found
+for a non-flag option, and `option_parse_error` if the parser for an argument
+returns `nothing`.
+
+
+### Smolopt
+
+TODO.
+

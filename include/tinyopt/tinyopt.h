@@ -16,7 +16,7 @@
 namespace to {
 
 template <typename V = std::string, typename P = default_parser<V>, typename = std::enable_if_t<!std::is_same<V, void>::value>>
-maybe<V> parse(char **& argp, char shortopt, const char* longopt=nullptr, const P& parser = P{}) {
+maybe<V> parse(char**& argp, char shortopt, const char* longopt = nullptr, const P& parser = P{}) {
     const char* arg = argp[0];
 
     if (!arg || arg[0]!='-') {
@@ -57,7 +57,7 @@ maybe<V> parse(char **& argp, char shortopt, const char* longopt=nullptr, const 
     return v;
 }
 
-maybe<void> parse(char **& argp, char shortopt, const char* longopt) {
+maybe<void> parse(char**& argp, char shortopt, const char* longopt = nullptr) {
     if (!*argp || *argp[0]!='-') {
         return nothing;
     }

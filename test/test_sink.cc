@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include <tinyopt/miniopt.h>
+#include <tinyopt/smolopt.h>
 
 TEST(sink, refctor) {
     int a;
