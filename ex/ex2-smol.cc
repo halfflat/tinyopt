@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
             { to::action(help), to::flag, to::exit, "-h", "--help" }
         };
 
-        if (!to::run(opts, argc, argv)) return 0;
+        if (!to::run(opts, argc, argv+1)) return 0;
         std::cout << std::accumulate(x.begin(), x.end(), 0) << "\n";
     }
     catch (to::option_error& e) {

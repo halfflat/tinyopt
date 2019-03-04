@@ -523,3 +523,7 @@ In the following `Options` is any iterable collection of `option` values.
 Like the tinyopt `parse` functions, the `run()` function can throw `missing_argument` or
 `option_parse_error`. In addition, it will throw `missing_mandatory_option` if an option
 marked with `to::mandatory` is not found during command line argument parsing.
+
+Note that the arguments in `argv` are checked from the beginning; when calling `run` from within,
+e.g the main function `int main(int argc, char** argv)`, one should pass `argv+1` to `run`
+so as to avoid including the program name in `argv[0]`.

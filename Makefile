@@ -3,7 +3,7 @@
 
 top:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-examples:=ex1-tiny ex1-smol ex2-tiny ex2-smol ex4-smol
+examples:=ex1-tiny ex1-smol ex2-tiny ex2-smol ex3-tiny ex3-smol ex4-smol
 all:: unit $(examples)
 
 test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc test_parse.cc test_parsers.cc test_saved_options.cc test_run.cc
@@ -44,6 +44,12 @@ ex2-tiny: ex2-tiny.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 ex2-smol: ex2-smol.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+ex3-tiny: ex3-tiny.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+ex3-smol: ex3-smol.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 ex4-smol: ex4-smol.o

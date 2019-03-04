@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
 	    { to::action(help), to::flag, to::exit, "-h", "--help" }
 	};
 
-	if (!to::run(opts, argc, argv)) return 0;
+	if (!to::run(opts, argc, argv+1)) return 0;
 
 	if (argv[1]) throw to::option_error("unrecogonized argument", argv[1]);
 	if (n<1) throw to::option_error("N must be at least 1");
