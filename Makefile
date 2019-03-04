@@ -6,7 +6,7 @@ top:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 examples:=ex1-tiny ex1-smol ex4-smol demo-tinyopt demo-miniopt
 all:: unit $(examples)
 
-test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc test_parse.cc test_saved_options.cc
+test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc test_parse.cc test_saved_options.cc test_run.cc
 
 all-src:=$(test-src) $(patsubst %, %.cc, $(examples))
 all-obj:=$(patsubst %.cc, %.o, $(all-src))

@@ -47,7 +47,8 @@ TEST(state, match_long) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ("value"s, arg);
+        ASSERT_TRUE(arg);
+        EXPECT_EQ("value"s, *arg);
         EXPECT_EQ("rest"s, M.argv[0]);
     }
 
@@ -74,7 +75,8 @@ TEST(state, match_long) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ("value"s, arg);
+        ASSERT_TRUE(arg);
+        EXPECT_EQ("value"s, *arg);
         EXPECT_EQ("rest"s, M.argv[0]);
     }
 
@@ -83,7 +85,7 @@ TEST(state, match_long) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ(nullptr, arg);
+        EXPECT_FALSE(arg);
         EXPECT_EQ("keyvalue"s, M.argv[0]);
     }
 }
@@ -96,7 +98,8 @@ TEST(state, match_short) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ("value"s, arg);
+        ASSERT_TRUE(arg);
+        EXPECT_EQ("value"s, *arg);
         EXPECT_EQ("rest"s, M.argv[0]);
     }
 
@@ -114,7 +117,7 @@ TEST(state, match_short) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ(nullptr, arg);
+        EXPECT_FALSE(arg);
         EXPECT_EQ("key=value"s, M.argv[0]);
     }
 
@@ -132,7 +135,7 @@ TEST(state, match_short) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ(nullptr, arg);
+        EXPECT_FALSE(arg);
         EXPECT_EQ("keyvalue"s, M.argv[0]);
     }
 }
@@ -145,7 +148,8 @@ TEST(state, match_compact) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ("value"s, arg);
+        ASSERT_TRUE(arg);
+        EXPECT_EQ("value"s, *arg);
         EXPECT_EQ("rest"s, M.argv[0]);
     }
 
@@ -163,7 +167,8 @@ TEST(state, match_compact) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ("=value"s, arg);
+        ASSERT_TRUE(arg);
+        EXPECT_EQ("=value"s, *arg);
         EXPECT_EQ("rest"s, M.argv[0]);
     }
 
@@ -181,7 +186,8 @@ TEST(state, match_compact) {
         to::state s(M.argc, M.argv);
 
         auto arg = s.match_option(k);
-        EXPECT_EQ("value"s, arg);
+        ASSERT_TRUE(arg);
+        EXPECT_EQ("value"s, *arg);
         EXPECT_EQ("rest"s, M.argv[0]);
     }
 }

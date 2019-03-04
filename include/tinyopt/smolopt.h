@@ -102,8 +102,8 @@ struct state {
 
     // Match an option given by the key which takes an argument.
     // If successful, consume option and argument and return pointer to
-    // argument string, else return nullptr.
-    const char* match_option(const key& k) {
+    // argument string, else return nothing.
+    maybe<const char*> match_option(const key& k) {
         const char* p = nullptr;
 
         if (k.style==key::compact) {
@@ -113,21 +113,24 @@ struct state {
                     shift(2);
                 }
                 else shift();
+                return p;
             }
         }
         else if (!optoff && k.label==*argv) {
             p = argv[1];
             shift(2);
+            return p;
         }
         else if (!optoff && k.style==key::longfmt) {
             auto keylen = k.label.length();
             if (!std::strncmp(*argv, k.label.c_str(), keylen) && (*argv)[keylen]=='=') {
                 p = &(*argv)[keylen+1];
                 shift();
+                return p;
             }
         }
 
-        return p;
+        return nothing;
     }
 
     // Match a flag given by the key.
@@ -339,9 +342,9 @@ struct option {
         return false;
     }
 
-    void run(const key& k, const char* arg) const {
-        if (!is_flag && !arg) throw missing_argument(k.label);
-        if (!s(arg)) throw option_parse_error(k.label);
+    void run(const std::string& label, const char* arg) const {
+        if (!is_flag && !arg) throw missing_argument(label);
+        if (!s(arg)) throw option_parse_error(label);
     }
 };
 
@@ -457,39 +460,48 @@ struct saved_options: private std::vector<std::string> {
 // Option with mutable state (for checking single and mandatory flags),
 // used by to::run().
 
-struct option_state: option {
-    int count = 0;
+namespace impl {
+    struct counted_option: option {
+        int count = 0;
 
-    option_state(const option& o): option(o) {}
+        counted_option(const option& o): option(o) {}
 
-    // On successful match, return pointers to matched key and value.
-    // For flags, use nullptr for value.
-    maybe<std::pair<const char*, const char*>> match(state& st) {
-        if (is_flag) {
-            for (auto& k: keys) {
-                if (st.match_flag(k)) return set(k, nullptr);
+        // On successful match, return pointers to matched key and value.
+        // For flags, use nullptr for value; for empty key sets, use
+        // nullptr for key.
+        maybe<std::pair<const char*, const char*>> match(state& st) {
+            if (is_flag) {
+                for (auto& k: keys) {
+                    if (st.match_flag(k)) return set(k.label, nullptr);
+                }
+                return nothing;
             }
-            return nothing;
-        }
-        else if (!keys.empty()) {
-            for (auto& k: keys) {
-                if (auto param = st.match_option(k)) return set(k, param);
+            else if (!keys.empty()) {
+                for (auto& k: keys) {
+                    if (auto param = st.match_option(k)) return set(k.label, *param);
+                }
+                return nothing;
             }
-            return nothing;
+            else {
+                const char* param = *st.argv;
+                st.shift();
+                return set("", param);
+            }
         }
-        else {
-            const char* param = *st.argv;
-            st.shift();
-            return set("", param);
-        }
-    }
 
-    std::pair<const char*, const char*> set(const key& k, const char* arg) {
-        run(k, arg);
-        ++count;
-        return {k.label.c_str(), arg};
-    }
-};
+        std::pair<const char*, const char*> set(const char* arg) {
+            run("", arg);
+            ++count;
+            return {nullptr, arg};
+        }
+
+        std::pair<const char*, const char*> set(const std::string& label, const char* arg) {
+            run(label, arg);
+            ++count;
+            return {label.c_str(), arg};
+        }
+    };
+} // namespace impl
 
 // Running a set of options
 // ------------------------
@@ -506,76 +518,76 @@ struct option_state: option {
 // will return a saved_options structure recording the successfully parsed
 // options.
 
+namespace impl {
+    inline maybe<saved_options> run(std::vector<impl::counted_option>& opts, int& argc, char** argv) {
+        saved_options collate;
+        bool exit = false;
+        state st{argc, argv};
+        while (st && !exit) {
+            // Try options with a key first.
+            for (auto& o: opts) {
+                if (o.is_single && o.count) continue;
+                if (o.keys.empty()) continue;
+                if (auto ma = o.match(st)) {
+                    if (!o.is_ephemeral) {
+                        if (ma->first) collate.add(ma->first);
+                        if (ma->second) collate.add(ma->second);
+                    }
+                    exit = o.is_exit;
+                    goto next;
+                }
+            }
+
+            // Literal "--" terminates option parsing.
+            if (!std::strcmp(*argv, "--")) {
+                st.shift();
+                return collate;
+            }
+
+            // Try free options.
+            for (auto& o: opts) {
+                if (o.is_single && o.count) continue;
+                if (!o.keys.empty()) continue;
+                if (auto ma = o.match(st)) {
+                    if (!o.is_ephemeral) collate.add(ma->second);
+                    exit = o.is_exit;
+                    goto next;
+                }
+            }
+
+            // Nothing matched, so increment argv.
+            st.skip();
+        next: ;
+        }
+
+        return exit? nothing: just(collate);
+    }
+} // namespace impl
+
+
 template <typename Options>
-maybe<saved_options> run(const Options& options, int& argc, char** argv) {
+maybe<saved_options> run(const Options& options, int& argc, char** argv, const saved_options& restore = saved_options{}) {
     using std::begin;
     using std::end;
-    std::vector<option_state> opts(begin(options), end(options));
+    std::vector<impl::counted_option> opts(begin(options), end(options));
+    auto r_args = restore.as_arglist();
 
-    saved_options collate;
-    bool exit = false;
-    state st{argc, argv};
-    while (st && !exit) {
-        // Try options with a key first.
+    saved_options coll1, coll2;
+    if (coll1 << impl::run(opts, r_args.argc, r_args.argv) && coll2 << impl::run(opts, argc, argv)) {
         for (auto& o: opts) {
-            if (o.is_single && o.count) continue;
-            if (o.keys.empty()) continue;
-            if (auto ma = o.match(st)) {
-                if (!o.is_ephemeral) {
-                    collate.add(ma->first);
-                    if (ma->second) collate.add(ma->second);
-                }
-                exit = o.is_exit;
-                goto next;
-            }
+            if (o.is_mandatory && !o.count) throw missing_mandatory_option(o.prefkey);
         }
-
-        // Literal "--" terminates option parsing.
-        if (!std::strcmp(*argv, "--")) {
-            st.shift();
-            return collate;
-        }
-
-        // Try free options.
-        for (auto& o: opts) {
-            if (o.is_single && o.count) continue;
-            if (!o.keys.empty()) continue;
-            if (auto ma = o.match(st)) {
-                if (!o.is_ephemeral) collate.add(ma->second);
-                exit = o.is_exit;
-                goto next;
-            }
-        }
-
-        // Nothing matched, so increment argv.
-        st.skip();
-    next: ;
+        return coll1 += coll2;
     }
 
-    if (exit) return nothing;
-
-    for (auto& o: opts) {
-        if (o.is_mandatory && !o.count) throw missing_mandatory_option(o.prefkey);
-    }
-    return collate;
+    return nothing;
 }
 
 template <typename Options>
 maybe<saved_options> run(const Options& options, const saved_options& restore) {
-    auto A = restore.as_arglist();
-    return run(options, A.argc, A.argv);
-}
-
-template <typename Options>
-maybe<saved_options> run(const Options& options, int& argc, char** argv, const saved_options& restore) {
-    saved_options coll1, coll2;
-
-    if (coll1 << run(options, restore) && coll2 << run(options, argc, argv)) {
-        coll1 += coll2;
-        return coll1;
-    }
-
-    return nothing;
+    int ignore_argc = 0;
+    char* end_of_args = nullptr;
+    return run(options, ignore_argc, &end_of_args, restore);
 }
 
 template <typename Options>

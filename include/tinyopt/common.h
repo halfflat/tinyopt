@@ -75,6 +75,20 @@ struct default_parser {
 };
 
 template <>
+struct default_parser<const char*> {
+    maybe<const char*> operator()(const char* text) const {
+        return just(text);
+    }
+};
+
+template <>
+struct default_parser<std::string> {
+    maybe<std::string> operator()(const char* text) const {
+        return just(std::string(text));
+    }
+};
+
+template <>
 struct default_parser<void> {
     maybe<void> operator()(const char* text) const {
         return something;
