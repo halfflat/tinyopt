@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <sstream>
@@ -69,8 +70,8 @@ struct default_parser {
         if (!text) return nothing;
         V v;
         std::istringstream stream(text);
-        stream >> v;
-        return stream? maybe<V>(v): nothing;
+        stream >> v >> std::ws;
+        return stream && stream.get()==EOF? maybe<V>(v): nothing;
     }
 };
 
@@ -136,7 +137,7 @@ template <typename P>
 class delimited_parser {
     char delim_;
     P parse_;
-    using inner_value_type = decltype(*std::declval<P>()(""));
+    using inner_value_type = std::decay_t<decltype(*std::declval<P>()(""))>;
 
 public:
     template <typename Q>
@@ -146,12 +147,15 @@ public:
         if (!text) return nothing;
 
         std::vector<inner_value_type> values;
+        if (!*text) return values;
 
         std::size_t n = std::strlen(text);
         std::vector<char> input(1+n);
         std::copy(text, text+n, input.data());
 
-        for (char* p = input.data(); *p; ) {
+        char* p = input.data();
+        char* end = input.data()+1+n;
+        do {
             char* q = p;
             while (*q && *q!=delim_) ++q;
             *q++ = 0;
@@ -160,7 +164,7 @@ public:
             else return nothing;
 
             p = q;
-        }
+        } while (p<end);
 
         return values;
     }
@@ -171,7 +175,7 @@ public:
 template <typename Q>
 auto delimited(char delim, Q&& parse) {
     using P = std::decay_t<Q>;
-    return delimited_parser<Q>(delim, std::forward<Q>(parse));
+    return delimited_parser<P>(delim, std::forward<Q>(parse));
 }
 
 template <typename V>

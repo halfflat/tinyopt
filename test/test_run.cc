@@ -203,3 +203,33 @@ TEST(run, restore_mandatory) {
     EXPECT_THROW(to::run(opts, M3.argc, M3.argv), to::missing_mandatory_option);
 }
 
+TEST(run, keyless) {
+    bool a = false;
+    std::string kl_first;
+    int kl_second = 0;
+
+    to::option opts[] = {
+        {kl_first, to::single},
+        {kl_second, to::single},
+        {to::set(a), "-a", to::flag}
+    };
+
+    mockargs M1("first\0002\0");
+    auto r1 = to::run(opts, M1.argc, M1.argv);
+    ASSERT_TRUE(r1);
+    EXPECT_EQ((svector{"first", "2"}), svector(r1->begin(), r1->end()));
+    EXPECT_EQ("first"s, kl_first);
+    EXPECT_EQ(2, kl_second);
+
+    a = false;
+    kl_first = "";
+    kl_second = 0;
+
+    mockargs M2("-a\0foo\0003\0");
+    auto r2 = to::run(opts, M2.argc, M2.argv);
+    ASSERT_TRUE(r2);
+    EXPECT_EQ((svector{"-a", "foo", "3"}), svector(r2->begin(), r2->end()));
+    EXPECT_TRUE(a);
+    EXPECT_EQ("foo"s, kl_first);
+    EXPECT_EQ(3, kl_second);
+}

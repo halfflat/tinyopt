@@ -57,7 +57,7 @@ maybe<V> parse(char**& argp, char shortopt, const char* longopt = nullptr, const
     return v;
 }
 
-maybe<void> parse(char**& argp, char shortopt, const char* longopt = nullptr) {
+inline maybe<void> parse(char**& argp, char shortopt, const char* longopt = nullptr) {
     if (!*argp || *argp[0]!='-') {
         return nothing;
     }
