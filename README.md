@@ -2,13 +2,14 @@ Smaller, better? option parsing.
 
 ## Goals
 
-There are 1391 command line option parsing libraries for C++, but only a few
-are popular. [TCLAP](http://tclap.sourceforge.org) is one, but it is heavy
-weight, and has annoying default behaviour which is hard to customize.
-There's also [Boost.Program_options](https://www.boost.org/doc/libs/release/libs/program_options/)
-which is also kinda huge.
+There are approximately 1391 command line option parsing libraries for C++, but
+only a few are popular. [TCLAP](http://tclap.sourceforge.org) is one, but it is
+heavy weight, and has annoying default behaviour which is hard to customize.
+There's also
+[Boost.Program_options](https://www.boost.org/doc/libs/release/libs/program_options/)
+which is also rather huge.
 
-So this project constitutes yet another header-only option parsing library.
+This project constitutes yet another header-only option parsing library.
 Actually, two. `tinyopt` is quite minimal: all it does is handle the
 problem of matching and parsing an option specification; user code
 iterates through the argument list itself. `smolopt` aims to answer
@@ -26,7 +27,7 @@ Features:
 * Support 'short' and 'long' style arguments: `-v 3` and `--value=3`.
 * [`smolopt` only] Support 'compact' bunching of arguments: `-abc 3` vs `-a -b -c 3`.
 * [`smolopt` only] Save and restore options and arguments in a shell-compatible format,
-  allowing e.g. `program `cat previous-options` --foo=bar`.
+  allowing e.g. `` program `cat previous-options` --foo=bar ``.
 
 Non-features:
 
@@ -438,9 +439,9 @@ option's sink.
 
 Some example specifications:
 ```
-    // Saves integer argument to variable 'a':
-    int a = 0;
-    to::option opt_a = { a, "-a" };
+    // Saves integer argument to variable 'n':
+    int n = 0;
+    to::option opt_n = { n, "-n" };
 
     // Flag '-v' or '--verbose' that increases verbosity level, but is not
     // kept in the returned list of saved options.
@@ -450,11 +451,11 @@ Some example specifications:
     // Save vector of values from one argument of comma separated values, e.g.
     // -x 1,2,3,4,5:
     std::vector<int> xs;
-    to::option opt_x = { {xs, to::delimited(xs)}, "-x" };
+    to::option opt_x = { {xs, to::delimited<int>()}, "-x" };
 
     // Save vector of values one by one, e.g.,
     // -k 1 -k 2 -k 3 -k 4 -k 5
-    to::option opt_k = { to::push_back{xs}, "-k" };
+    to::option opt_k = { to::push_back(xs), "-k" };
 
     // A 'help' flag that calls a help() function and stops fruther option processing.
     to::option opt_h = { to::action(help), to::flag, to::exit, "-h", "--help" };
