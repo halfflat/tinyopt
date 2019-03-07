@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
 	    { to::action(help), to::flag, to::exit, "-h", "--help" }
 	};
 
-	if (!to::run(opts, argc, argv)) return 0;
+	if (!to::run(opts, argc, argv+1)) return 0;
 
 	if (argv[1]) throw to::option_error("unrecogonized argument", argv[1]);
 	if (n<1) throw to::option_error("N must be at least 1");
@@ -217,7 +217,7 @@ The option parsers can throw exceptions derived from `option_error`, namely:
 Extract a program name from `argv0` (everything after the last '/' if present) and
 print a message to standard out in the form "Usage: <program-name> <usagemsg>\n".
 
-#### `usage(const char *argv0, const std::string& usagemsg, const srd::string& error)`
+#### `usage(const char *argv0, const std::string& usagemsg, const std::string& error)`
 
 Extract a program name from `argv0` (everything after the last '/' if present) and
 print a message to standard error in the form
