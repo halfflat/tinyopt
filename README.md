@@ -39,7 +39,8 @@ Non-features:
   The user code really ought to know best in this circumstance.
 * No localization in `usage` helper function.
   This would not be terribly hard to add, but will maybe sorta add this later.
-* Does not automatically enforce any inter-option constraints.
+* Does not automatically enforce any inter-option constraints (other than the
+  new modal options, see below!).
   This can require arbitrarily complex support in any library,
   where it can instead be handled much more easily on the user side.
 
@@ -304,9 +305,11 @@ workflow is:
    to allow for re-execution of the code with the same arguments.
 
 An `option` describes one command line flag or option with an argument. It has
-three components: a `sink`, that describes what to do with a successfully parsed
+five components: a `sink`, that describes what to do with a successfully parsed
 option; a set of `key`s, which are how the option is presented on the command line;
-and a set of option flags that modify behaviour.
+a sequence of `filter`s, which can limit the scope in which the option is valid;
+a sequence of `modal`s, which change the modal state of the parser when the option
+is matched; and finally a set of option flags that modify behaviour.
 
 #### Sinks
 
@@ -340,6 +343,9 @@ The `action` wrapper function takes a nullary or unary function or functional
 object, and optionally a parser for the function's argument. It returns a
 `sink` object that applies the default or supplied parser object
 and if successful, calls the function with the parsed value.
+
+A special action wrapper is `error(const std::string& message)`, which will
+throw a `user_option_error` with the given message.
 
 #### Sink adaptors
 
@@ -416,6 +422,32 @@ from the use of string literal functions:
 The string literal operators are included in an inline namespace `literals`
 that can be included in user code via `using namespace to::literals`.
 
+####Filters and modals
+
+Options are by default always available for consideration. The `to::single`
+flag described below provides one simple constraint on option matching; the
+modal interfaces provide a more elaborate system should it be required.
+
+Each option maintains a sequence of _filters_ and a sequence of _modals_.
+
+A _filter_ is a `to::filter` object (an alias for `std::function<bool (int)>`)
+that takes the current mode (an integer, by default zero) and returns `false`
+if the option should not be considered for matching. Options will be ignored if
+any of its filters return false.
+
+A _modal_ is a `to::modal` object (an alias for `std::functional<int (int)>`)
+that is passed the current mode value and returns the new mode value when the
+option is successfully matched and parsed.
+
+Filters can be made with the `to::when` adaptor. Given a functional object,
+it will wrap it in a `to::filter`. Given an integer value, it will make
+a `to::filter` that returns true only if the mode matches that value.
+If `to::when` is given multiple argument, it constructs a filter that is
+the disjunction of filters constructed from each argument.
+
+`to::then(f)` constructs a `to::modal` object wrapping the functional object `f`;
+`to::then(int v)` constructs a `to::modal` that just returns the value `m`.
+
 #### Flags
 
 Option behaviour can be modified by supplying `enum option_flag` values:
@@ -431,7 +463,7 @@ These enum values are all powers of two and can be combined via bitwise or `|`.
 #### Specifying an option
 
 The `option` constructor takes a `sink` as the first argument, followed by
-any number of keys and flags in any order.
+any number of keys, filters, modals, and flags in any order.
 
 An `option` may have no keys at all — these will always match an item in the
 command line argument list, and that item will be passed directly to the
@@ -459,6 +491,12 @@ Some example specifications:
 
     // A 'help' flag that calls a help() function and stops fruther option processing.
     to::option opt_h = { to::action(help), to::flag, to::exit, "-h", "--help" };
+
+    // A modal flag that sets the mode to 2, and a filtered option that only
+    // applies when the mode is 2.
+    enum mode { none = 0, list = 1, install = 2} prog_mode = none;
+    to::option opt_m = { to::set(prog_mode, install), "install", to::then(install) };
+    to::option opt_h = { to::action(install_help), to::flag, to::exit, "-h", "--help", to::when(install) };
 
     // Compact option keys using to::literals:
     using namespace to::literals;

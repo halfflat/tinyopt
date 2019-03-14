@@ -46,15 +46,17 @@ TEST(key, literal) {
 
 TEST(option, ctor) {
     using namespace to::literals;
-    int a, b, c, d;
-    std::string e;
+    int a, b, c, d, e, f;
+    std::string g;
 
     to::option opts[] = {
         {a, to::ephemeral, to::single, "-a", "--arg"},
         {b, to::mandatory, "-b", "--bob"},
         {to::increment(c), to::flag, "-c", "--cat"},
         {to::action([&d](int) {++d;}), "-d"_compact},
-        {e},
+        {e, to::flag, to::when(3), to::then(4), "-a"},
+        {f, to::then(17), to::then([](int k) { return k+1; }), "-a"},
+        {g},
     };
 
     EXPECT_FALSE(opts[0].is_flag);
@@ -77,6 +79,13 @@ TEST(option, ctor) {
     EXPECT_FALSE(opts[3].is_single);
     EXPECT_FALSE(opts[3].is_mandatory);
 
+    EXPECT_TRUE(opts[4].is_flag);
+    EXPECT_EQ(1u, opts[4].filters.size());
+    EXPECT_EQ(1u, opts[4].modals.size());
+
+    EXPECT_EQ(0u, opts[5].filters.size());
+    EXPECT_EQ(2u, opts[5].modals.size());
+
     using svec = std::vector<std::string>;
     auto key_labels = [](const to::option& o) {
         svec labels;
@@ -86,7 +95,43 @@ TEST(option, ctor) {
 
     EXPECT_EQ((svec{"-a", "--arg"}), key_labels(opts[0]));
     EXPECT_EQ((svec{"-d"}), key_labels(opts[3]));
-    EXPECT_EQ((svec{}), key_labels(opts[4]));
+    EXPECT_EQ((svec{}), key_labels(opts[6]));
+}
+
+TEST(option, modals) {
+    bool a;
+    to::option opts[] = {
+        {a, to::when(1)},
+        {a, to::when([](int k) { return k%2==0; }), to::when([](int k) { return k%3==0; })},
+        {a, to::then(8)},
+        {a, to::then(8), to::then([](int m) {return m+1;})},
+        {a, to::when(1, 3, 5, [](int k) { return k%2==0; })}
+    };
+
+    EXPECT_TRUE(opts[0].check_mode(1));
+    EXPECT_FALSE(opts[0].check_mode(0));
+
+    EXPECT_TRUE(opts[1].check_mode(6));
+    EXPECT_FALSE(opts[1].check_mode(3));
+    EXPECT_FALSE(opts[1].check_mode(4));
+
+    int mode = 0;
+    opts[0].set_mode(mode);
+    EXPECT_EQ(0, mode);
+
+    mode = 0;
+    opts[2].set_mode(mode);
+    EXPECT_EQ(8, mode);
+
+    mode = 0;
+    opts[3].set_mode(mode);
+    EXPECT_EQ(9, mode);
+
+    EXPECT_TRUE(opts[4].check_mode(8));
+    EXPECT_TRUE(opts[4].check_mode(1));
+    EXPECT_TRUE(opts[4].check_mode(3));
+    EXPECT_TRUE(opts[4].check_mode(5));
+    EXPECT_FALSE(opts[4].check_mode(7));
 }
 
 TEST(option, run) {

@@ -5,6 +5,11 @@
 
 #include <tinyopt/smolopt.h>
 
+TEST(sink, empty) {
+    to::sink s;
+    EXPECT_TRUE(s("foo"));
+}
+
 TEST(sink, refctor) {
     int a;
     to::sink sa(a);

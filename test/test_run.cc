@@ -233,3 +233,22 @@ TEST(run, keyless) {
     EXPECT_EQ("foo"s, kl_first);
     EXPECT_EQ(3, kl_second);
 }
+
+TEST(run, modal) {
+    int a0 = 0, a1 = 0, a2 = 0;
+    to::option opts[] = {
+        {to::increment(a0), "-a", to::flag, to::when(0)},
+        {to::increment(a1), "-a", to::flag, to::when(1)},
+        {to::increment(a2), "-a", to::flag, to::when(2)},
+        {{}, "one", to::flag, to::then(1)},
+        {{}, "two", to::flag, to::then(2)}
+    };
+
+    mockargs M("-a\0one\0-a\0two\0-a\0-a\0one\0-a\0-a\0");
+    auto r = to::run(opts, M.argc, M.argv);
+    EXPECT_TRUE(r);
+
+    EXPECT_EQ(1, a0);
+    EXPECT_EQ(3, a1);
+    EXPECT_EQ(2, a2);
+}

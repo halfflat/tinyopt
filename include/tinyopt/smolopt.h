@@ -206,6 +206,10 @@ struct sink {
     // Tag class for constructor.
     static struct action_t {} action;
 
+    sink():
+        sink(action, [](const char* param) { return true; })
+    {}
+
     template <typename V>
     sink(V& var): sink(var, default_parser<V>{}) {}
 
@@ -228,7 +232,7 @@ struct sink {
 // Convenience functions for construction of sink actions
 // with explicit or implicit parser.
 
-template <typename F, typename A = unary_argument_type_t<F>>
+template <typename F, typename A = std::decay_t<unary_argument_type_t<F>>>
 sink action(F f) {
     return sink(sink::action,
         [f = std::move(f)](const char* arg) -> bool {
@@ -241,6 +245,17 @@ sink action(F f, P parser) {
     return sink(sink::action,
         [f = std::move(f), parser = std::move(parser)](const char* arg) -> bool {
             return static_cast<bool>(f << parser(arg));
+        });
+}
+
+// Special actions:
+//
+// error(message)    Throw a user_option_error with the supplied message.
+
+inline sink error(std::string message) {
+    return sink(sink::action,
+        [m = std::move(message)](const char*) -> bool {
+            throw user_option_error(m);
         });
 }
 
@@ -281,6 +296,61 @@ sink increment(V& v, X delta) {
     return action([ref = std::ref(v), delta = std::move(delta)] { ref.get() += delta; });
 }
 
+// Modal configuration
+// -------------------
+//
+// Options can be filtered by some predicate, and can trigger a state
+// change when successfully processed.
+//
+// Filter construction:
+//     to::when(Fn f)       f is a functional with signature bool (int)
+//     to::when(int s)      equivalent to to::when([](int k) { return k==s; })
+//     to::when(a, b, ...)  filter than is satisfied by to::when(a) or
+//                          to::when(b) or ...
+//
+// The argument to the filter predicate is the 'mode', a mutable state maintained
+// during a single run of to::run().
+//
+// Mode changes:
+//     to::then(Fn f)       f is a functional with signature int (int)
+//     to::then(int s)      equivalent to to::then([](int) { return s; })
+//
+// The argument to the functional is the current mode; the return value
+// sets the new value of mode.
+//
+// Filters are called before keys are matched; modal changes are called
+// after an option is processed. All 
+
+using filter = std::function<bool (int)>;
+using modal = std::function<int (int)>;
+
+template <typename F, typename = decltype(std::declval<F>()(0))>
+filter when(F f) {
+    return [f = std::move(f)](int mode) { return static_cast<bool>(f(mode)); };
+}
+
+inline filter when(int m) {
+    return [m](int mode) { return m==mode; };
+}
+
+template <typename A, typename B, typename... Rest>
+filter when(A a, B&& b, Rest&&... rest) {
+    return
+        [fhead = when(std::forward<A>(a)),
+         ftail = when(std::forward<B>(b), std::forward<Rest>(rest)...)](int m) {
+        return fhead(m) || ftail(m);
+    };
+}
+
+template <typename F, typename = decltype(std::declval<F>()(0))>
+modal then(F f) {
+    return [f = std::move(f)](int mode) { return static_cast<int>(f(mode)); };
+}
+
+inline modal then(int m) {
+    return [m](int) { return m; };
+}
+
 
 // Option specification
 // --------------------
@@ -302,6 +372,8 @@ enum option_flag {
 struct option {
     sink s;
     std::vector<key> keys;
+    std::vector<filter> filters;
+    std::vector<modal> modals;
     std::string prefkey;
 
     bool is_flag = false;
@@ -328,6 +400,18 @@ struct option {
     }
 
     template <typename... Rest>
+    void init_(filter f, Rest&&... rest) {
+        filters.push_back(std::move(f));
+        init_(std::forward<Rest>(rest)...);
+    }
+
+    template <typename... Rest>
+    void init_(modal f, Rest&&... rest) {
+        modals.push_back(std::move(f));
+        init_(std::forward<Rest>(rest)...);
+    }
+
+    template <typename... Rest>
     void init_(key k, Rest&&... rest) {
         if (k.label.length()>prefkey.length()) prefkey = k.label;
         keys.push_back(std::move(k));
@@ -340,6 +424,17 @@ struct option {
             if (arg==k.label) return true;
         }
         return false;
+    }
+
+    bool check_mode(int mode) const {
+        for (auto& f: filters) {
+            if (!f(mode)) return false;
+        }
+        return true;
+    }
+
+    void set_mode(int& mode) const {
+        for (auto& f: modals) mode = f(mode);
     }
 
     void run(const std::string& label, const char* arg) const {
@@ -523,16 +618,20 @@ namespace impl {
         saved_options collate;
         bool exit = false;
         state st{argc, argv};
+        int mode = 0;
         while (st && !exit) {
             // Try options with a key first.
             for (auto& o: opts) {
-                if (o.is_single && o.count) continue;
                 if (o.keys.empty()) continue;
+                if (o.is_single && o.count) continue;
+                if (!o.check_mode(mode)) continue;
+
                 if (auto ma = o.match(st)) {
                     if (!o.is_ephemeral) {
                         if (ma->first) collate.add(ma->first);
                         if (ma->second) collate.add(ma->second);
                     }
+                    o.set_mode(mode);
                     exit = o.is_exit;
                     goto next;
                 }
@@ -546,10 +645,13 @@ namespace impl {
 
             // Try free options.
             for (auto& o: opts) {
-                if (o.is_single && o.count) continue;
                 if (!o.keys.empty()) continue;
+                if (o.is_single && o.count) continue;
+                if (!o.check_mode(mode)) continue;
+
                 if (auto ma = o.match(st)) {
                     if (!o.is_ephemeral) collate.add(ma->second);
+                    o.set_mode(mode);
                     exit = o.is_exit;
                     goto next;
                 }
