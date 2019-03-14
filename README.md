@@ -422,7 +422,7 @@ from the use of string literal functions:
 The string literal operators are included in an inline namespace `literals`
 that can be included in user code via `using namespace to::literals`.
 
-####Filters and modals
+#### Filters and modals
 
 Options are by default always available for consideration. The `to::single`
 flag described below provides one simple constraint on option matching; the
