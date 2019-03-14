@@ -54,7 +54,7 @@ any values.
 
 As an example, the options `set/one` `set/two` and `set/three` can be combined as:
 ```
-# ex4-smol set/one/two/three
+% ex4-smol set/one/two/three
 set/one
 set/two
 set/three
@@ -63,14 +63,41 @@ set/three
 This example also shows how the saved option data can be used to
 replay previous command line invocations, e.g.
 ```
-# ex4-smol --save saved.opt -aab
+% ex4-smol --save saved.opt -aab
 a=2
 b=1
 # cat saved.opt
 -a -a -b
-# ex4-smol -c $(<saved.opt)
+% ex4-smol -c $(<saved.opt)
 a=2
 b=1
 c=1
 ```
  
+## Example 5 — modal options
+
+Specifying `to::when` and `to::then` in an option allows for
+modal behaviour when parsing the command line arguments.
+
+In `ex5-smol`, the flag "echo" on the command line causes the
+program to emit the following words one per line, while "ohce",
+in turn, causes the following words to be emitted backwards.
+
+The example code also demonstrates the use of `to:error`, an action helper
+that will cause a `to::user_option_error` to be thrown.
+
+Sample run:
+```
+% ex5-smol hello
+ex5-smol: unrecognized keyword
+Usage: ex5-smol [echo [word...] | ohce [word...]] ...
+
+Print words afer 'echo' one per line;
+Print words after 'oche' backwards, one per line.
+% ex5-smol echo how now ohce brown echo cow
+how
+now
+nworb
+cow
+```
+```
