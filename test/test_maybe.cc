@@ -135,3 +135,18 @@ TEST(maybe, conditional_apply_arg) {
     EXPECT_FALSE(r2);
     EXPECT_EQ(110, c);
 }
+
+TEST(maybe, conv) {
+    maybe<void> a(maybe<int>{});
+    EXPECT_FALSE(a);
+
+    maybe<void> b(maybe<int>{1});
+    EXPECT_TRUE(b);
+
+    maybe<double> c(maybe<int>{});
+    EXPECT_FALSE(c);
+
+    maybe<double> d(maybe<int>{1});
+    EXPECT_TRUE(d);
+    EXPECT_EQ(1., d.value());
+}

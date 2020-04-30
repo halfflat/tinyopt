@@ -2,19 +2,13 @@ Smaller, better? option parsing.
 
 ## Goals
 
-There are approximately 1391 command line option parsing libraries for C++, but
-only a few are popular. [TCLAP](http://tclap.sourceforge.org) is one, but it is
-heavy weight, and has annoying default behaviour which is hard to customize.
-There's also
-[Boost.Program_options](https://www.boost.org/doc/libs/release/libs/program_options/)
-which is also rather huge.
+This project constitutes yet another header-only option parsing library,
+not as clumsy or random as TCLAP.
 
-This project constitutes yet another header-only option parsing library.
-Actually, two. `tinyopt` is quite minimal: all it does is handle the
-problem of matching and parsing an option specification; user code
-iterates through the argument list itself. `smolopt` aims to answer
-demands from another project where it was deemed that `tinyopt` was
-in fact too tiny, and so does much more of the heavy lifting.
+It actually provides two interfaces. `tinyopt` is quite minimal: all it does
+is handle the problem of matching and parsing an option specification; user code
+iterates through the argument list itself. `smolopt` aims to do much more
+of the heavy lifting and supports more sophisticated option handling schemes.
 
 Design goals:
 
@@ -32,15 +26,13 @@ Features:
 Non-features:
 
 * Doesn't support multibyte encodings with shift sequences.
-  This is due to laziness.
-* (But does try not to break UTF-8 at least.)
-  This, essentially, is also due to laziness.
+  This is due to laziness. But it tries not to break UTF-8 at least.
 * Does not automatically generate help/usage text.
   The user code really ought to know best in this circumstance.
 * No localization in `usage` helper function.
-  This would not be terribly hard to add, but will maybe sorta add this later.
+  This would not be terribly hard to add, but might add that later.
 * Does not automatically enforce any inter-option constraints (other than the
-  new modal options, see below!).
+  modal to::when() and to::then() options, see below!).
   This can require arbitrarily complex support in any library,
   where it can instead be handled much more easily on the user side.
 
@@ -170,7 +162,7 @@ int main(int argc, char** argv) {
 
 ## Documentation
 
-All tinyopt and miniopt code lives in the namespace `to`. This namespace
+All tinyopt and smolopt code lives in the namespace `to`. This namespace
 is omitted in the descriptions below.
 
 ### Common classes and helpers
@@ -222,7 +214,7 @@ print a message to standard out in the form "Usage: <program-name> <usagemsg>\n"
 
 Extract a program name from `argv0` (everything after the last '/' if present) and
 print a message to standard error in the form
-"<program-name>: <error>\nUsage: <program-name> <usagemsg>\n".
+`<program-name>: <error>\nUsage: <program-name> <usagemsg>\n`.
 
 ### Parsers
 
@@ -322,7 +314,7 @@ A sink has three constructors:
 
   `action_t` is a tag type, indicating that the second argument is a functional
   to be used directly as the wrapped function. `sink::action` is a value with
-  this for use in this constructor.
+  this type for use in this constructor.
 
   This constructor is used by the `action` wrapper function described below.
 
@@ -424,29 +416,29 @@ that can be included in user code via `using namespace to::literals`.
 
 #### Filters and modals
 
-Options are by default always available for consideration. The `to::single`
+Options are by default always available for consideration. The `single`
 flag described below provides one simple constraint on option matching; the
 modal interfaces provide a more elaborate system should it be required.
 
 Each option maintains a sequence of _filters_ and a sequence of _modals_.
 
-A _filter_ is a `to::filter` object (an alias for `std::function<bool (int)>`)
+A _filter_ is a `filter` object (an alias for `std::function<bool (int)>`)
 that takes the current mode (an integer, by default zero) and returns `false`
 if the option should not be considered for matching. Options will be ignored if
 any of its filters return false.
 
-A _modal_ is a `to::modal` object (an alias for `std::functional<int (int)>`)
+A _modal_ is a `modal` object (an alias for `std::functional<int (int)>`)
 that is passed the current mode value and returns the new mode value when the
 option is successfully matched and parsed.
 
-Filters can be made with the `to::when` adaptor. Given a functional object,
-it will wrap it in a `to::filter`. Given an integer value, it will make
-a `to::filter` that returns true only if the mode matches that value.
-If `to::when` is given multiple argument, it constructs a filter that is
+Filters can be made with the `when` adaptor. Given a functional object,
+it will wrap it in a `filter`. Given an integer value, it will make
+a `filter` that returns true only if the mode matches that value.
+If `when` is given multiple arguments, it constructs a filter that is
 the disjunction of filters constructed from each argument.
 
-`to::then(f)` constructs a `to::modal` object wrapping the functional object `f`;
-`to::then(int v)` constructs a `to::modal` that just returns the value `m`.
+`then(f)` constructs a `modal` object wrapping the functional object `f`;
+`then(int v)` constructs a `modal` that just returns the value `m`.
 
 #### Flags
 
@@ -489,7 +481,7 @@ Some example specifications:
     // -k 1 -k 2 -k 3 -k 4 -k 5
     to::option opt_k = { to::push_back(xs), "-k" };
 
-    // A 'help' flag that calls a help() function and stops fruther option processing.
+    // A 'help' flag that calls a help() function and stops further option processing.
     to::option opt_h = { to::action(help), to::flag, to::exit, "-h", "--help" };
 
     // A modal flag that sets the mode to 2, and a filtered option that only
@@ -510,10 +502,10 @@ Some example specifications:
 
 #### Saved options
 
-The `to::run()` function (see below) returns `maybe<saved_options>`. The `saved_options`
+The `run()` function (see below) returns `maybe<saved_options>`. The `saved_options`
 object holds a record of the successfully parsed options. It wraps a `std::vector<std::string>`
 that has one element per option key and argument, in the order they were matched
-(excluding options with the `to::ephemeral` flag).
+(excluding options with the `ephemeral` flag).
 
 While the contents can be inspected via methods `begin()`, `end()`, `empty()` and `size()`,
 it is primarily intended to support serialization. Overloads of `operator<<` and `operator>>`
@@ -526,7 +518,7 @@ program invocations.
 
 A command line argument list or `saved_options` object is run against a collection of `option`
 specifications with `run()`. There are five overloads, each of which returns a `saved_options`
-value in normal execution or `nothing` if an option with the `to::exit` flag is matched.
+value in normal execution or `nothing` if an option with the `exit` flag is matched.
 
 In the following `Options` is any iterable collection of `option` values.
 
@@ -561,7 +553,7 @@ In the following `Options` is any iterable collection of `option` values.
 
 Like the tinyopt `parse` functions, the `run()` function can throw `missing_argument` or
 `option_parse_error`. In addition, it will throw `missing_mandatory_option` if an option
-marked with `to::mandatory` is not found during command line argument parsing.
+marked with `mandatory` is not found during command line argument parsing.
 
 Note that the arguments in `argv` are checked from the beginning; when calling `run` from within,
 e.g the main function `int main(int argc, char** argv)`, one should pass `argv+1` to `run`
