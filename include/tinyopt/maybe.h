@@ -1,5 +1,22 @@
 #pragma once
 
+// maybe<T> represents an optional value of type T,
+// with an interface similar to C++17 std::optional.
+//
+// Other than C++14 compatibility, the main deviations/extensions
+// from std::optional are:
+//
+// 1. maybe<void> represents an optional value of an 'empty' type.
+//    This is used primarily for consistency in generic uses of
+//    maybe in contexts where functions may not return or consume
+//    a value.
+//
+// 2. Monadic-like overloads of operator<< that lift a function
+//    or a functional object on the left hand side when the
+//    right hand side is maybe<T> (see below). With an lvalue
+//    on the left hand side, operator<< acts as a conditional
+//    assignment.
+
 #include <stdexcept>
 #include <utility>
 #include <type_traits>
@@ -13,14 +30,8 @@ namespace to {
 
 constexpr struct nothing_t {} nothing;
 
-// maybe<T> represents an optional value of type T,
-// with an interface similar to C++17 std::optional.
-
 template <typename T>
 struct maybe {
-    bool ok = false;
-    alignas(T) char data[sizeof(T)];
-
     maybe() noexcept: ok(false) {}
     maybe(nothing_t) noexcept: ok(false) {}
     maybe(const T& v): ok(true) { construct(v); }
@@ -52,7 +63,12 @@ struct maybe {
     bool has_value() const noexcept { return ok; }
     explicit operator bool() const noexcept { return ok; }
 
+    template <typename> friend class maybe;
+
 private:
+    bool ok = false;
+    alignas(T) char data[sizeof(T)];
+
     T* vptr() noexcept { return reinterpret_cast<T*>(data); }
     const T* vptr() const noexcept { return reinterpret_cast<const T*>(data); }
 
@@ -167,4 +183,5 @@ template <typename T>
 auto operator<<(T& x, const maybe<void>& m) -> maybe<std::decay_t<decltype(x=true)>> {
     if (m) return x=true; else return nothing;
 }
+
 } // namespace to

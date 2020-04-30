@@ -72,6 +72,9 @@ inline key operator""_compact(const char* label, std::size_t) {
 // to::state represents the collection of command line arguments. Mutating
 // operations (shift(), successful option matching, etc.) will modify the
 // underlying set of arguments used to construct the state object.
+//
+// This is used only internally — it is not part of the public API.
+// Members are left public for the purpose of unit testing.
 
 struct state {
     int& argc;
@@ -374,7 +377,6 @@ struct option {
     std::vector<key> keys;
     std::vector<filter> filters;
     std::vector<modal> modals;
-    std::string prefkey;
 
     bool is_flag = false;
     bool is_ephemeral = false;
@@ -384,37 +386,6 @@ struct option {
 
     template <typename... Rest>
     option(sink s, Rest&&... rest): s(std::move(s)) {
-        init_(std::forward<Rest>(rest)...);
-    }
-
-    void init_() {}
-
-    template <typename... Rest>
-    void init_(enum option_flag f, Rest&&... rest) {
-        is_flag      |= f & flag;
-        is_ephemeral |= f & ephemeral;
-        is_single    |= f & single;
-        is_mandatory |= f & mandatory;
-        is_exit      |= f & exit;
-        init_(std::forward<Rest>(rest)...);
-    }
-
-    template <typename... Rest>
-    void init_(filter f, Rest&&... rest) {
-        filters.push_back(std::move(f));
-        init_(std::forward<Rest>(rest)...);
-    }
-
-    template <typename... Rest>
-    void init_(modal f, Rest&&... rest) {
-        modals.push_back(std::move(f));
-        init_(std::forward<Rest>(rest)...);
-    }
-
-    template <typename... Rest>
-    void init_(key k, Rest&&... rest) {
-        if (k.label.length()>prefkey.length()) prefkey = k.label;
-        keys.push_back(std::move(k));
         init_(std::forward<Rest>(rest)...);
     }
 
@@ -441,6 +412,46 @@ struct option {
         if (!is_flag && !arg) throw missing_argument(label);
         if (!s(arg)) throw option_parse_error(label);
     }
+
+    std::string longest_label() const {
+        const std::string* p = 0;
+        for (auto& k: keys) {
+            if (!p || k.label.size()>p->size()) p = &k.label;
+        }
+        return p? *p: std::string{};
+    }
+
+private:
+    void init_() {}
+
+    template <typename... Rest>
+    void init_(enum option_flag f, Rest&&... rest) {
+        is_flag      |= f & flag;
+        is_ephemeral |= f & ephemeral;
+        is_single    |= f & single;
+        is_mandatory |= f & mandatory;
+        is_exit      |= f & exit;
+        init_(std::forward<Rest>(rest)...);
+    }
+
+    template <typename... Rest>
+    void init_(filter f, Rest&&... rest) {
+        filters.push_back(std::move(f));
+        init_(std::forward<Rest>(rest)...);
+    }
+
+    template <typename... Rest>
+    void init_(modal f, Rest&&... rest) {
+        modals.push_back(std::move(f));
+        init_(std::forward<Rest>(rest)...);
+    }
+
+    template <typename... Rest>
+    void init_(key k, Rest&&... rest) {
+        keys.push_back(std::move(k));
+        init_(std::forward<Rest>(rest)...);
+    }
+
 };
 
 // Saved options
@@ -677,7 +688,7 @@ maybe<saved_options> run(const Options& options, int& argc, char** argv, const s
     saved_options coll1, coll2;
     if (coll1 << impl::run(opts, r_args.argc, r_args.argv) && coll2 << impl::run(opts, argc, argv)) {
         for (auto& o: opts) {
-            if (o.is_mandatory && !o.count) throw missing_mandatory_option(o.prefkey);
+            if (o.is_mandatory && !o.count) throw missing_mandatory_option(o.longest_label());
         }
         return coll1 += coll2;
     }

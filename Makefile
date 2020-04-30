@@ -62,4 +62,4 @@ clean:
 	rm -f $(all-obj)
 
 realclean: clean
-	rm -f demo-tinyopt demo-miniopt unit $(examples) gtest.o $(depends)
+	rm -f unit $(examples) gtest.o $(depends)

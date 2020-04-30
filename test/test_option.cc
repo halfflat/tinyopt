@@ -6,6 +6,8 @@
 
 #include <tinyopt/smolopt.h>
 
+using namespace std::literals;
+
 TEST(key, ctor) {
     to::key a("--long");
     EXPECT_EQ("--long", a.label);
@@ -96,6 +98,17 @@ TEST(option, ctor) {
     EXPECT_EQ((svec{"-a", "--arg"}), key_labels(opts[0]));
     EXPECT_EQ((svec{"-d"}), key_labels(opts[3]));
     EXPECT_EQ((svec{}), key_labels(opts[6]));
+}
+
+TEST(option, longest_label) {
+    bool x;
+    to::option a(x);
+    EXPECT_EQ(""s, a.longest_label());
+
+    to::option b(x, "-b", "--bee");
+    to::option c(x, "--cee", "-c");
+    EXPECT_EQ("--bee"s, b.longest_label());
+    EXPECT_EQ("--cee"s, c.longest_label());
 }
 
 TEST(option, modals) {
