@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <tinyopt/maybe.h>
+#include <tinyopt/tinyopt.h>
 
 using namespace to;
 

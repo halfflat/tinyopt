@@ -3,7 +3,7 @@
 
 top:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-examples:=ex1-tiny ex1-smol ex2-tiny ex2-smol ex3-tiny ex3-smol ex4-smol ex5-smol
+examples:=ex1-parse ex1-run ex2-parse ex2-run ex3-parse ex3-run ex4-run ex5-run
 all:: unit $(examples)
 
 test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc test_parse.cc test_parsers.cc test_saved_options.cc test_run.cc
@@ -34,28 +34,28 @@ test-obj:=$(patsubst %.cc, %.o, $(test-src))
 unit: $(test-obj) gtest.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-ex1-tiny: ex1-tiny.o
+ex1-parse: ex1-parse.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-ex1-smol: ex1-smol.o
+ex1-run: ex1-run.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-ex2-tiny: ex2-tiny.o
+ex2-parse: ex2-parse.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-ex2-smol: ex2-smol.o
+ex2-run: ex2-run.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-ex3-tiny: ex3-tiny.o
+ex3-parse: ex3-parse.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-ex3-smol: ex3-smol.o
+ex3-run: ex3-run.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-ex4-smol: ex4-smol.o
+ex4-run: ex4-run.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-ex5-smol: ex5-smol.o
+ex5-run: ex5-run.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 clean:

@@ -2,8 +2,7 @@
 #include <string>
 
 #include <gtest/gtest.h>
-
-#include <tinyopt/smolopt.h>
+#include <tinyopt/tinyopt.h>
 
 TEST(sink, empty) {
     to::sink s;

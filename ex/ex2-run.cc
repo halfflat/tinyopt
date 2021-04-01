@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 
-#include <tinyopt/smolopt.h>
+#include <tinyopt/tinyopt.h>
 
 const char* usage_str =
     "[OPTION]...\n"
@@ -21,10 +21,12 @@ int main(int argc, char** argv) {
         };
 
         if (!to::run(opts, argc, argv+1)) return 0;
+        if (argv[1]) throw to::option_error("unrecognized argument", argv[1]);
+
         std::cout << std::accumulate(x.begin(), x.end(), 0) << "\n";
     }
     catch (to::option_error& e) {
-	to::usage(argv[0], usage_str, e.what());
-	return 1;
+        to::usage_error(argv[0], usage_str, e.what());
+        return 1;
     }
 }

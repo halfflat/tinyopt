@@ -4,7 +4,6 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-
 #include <tinyopt/tinyopt.h>
 
 using namespace std::literals;
