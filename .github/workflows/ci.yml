@@ -1,22 +1,21 @@
 name: Tinyopt CI
 
 on:
-    push: { branches: [ master ] }
-    pull_request: { branches: [ master ] }
+    push: { branches: [ main ] }
+    pull_request: { branches: [ main ] }
 
 jobs:
     build:
-        runs-on: ${{ matrix.config.os }}
+        runs-on: ${{ matrix.os }}
         strategy:
             matrix:
-                config:
-                    os: [ubuntu-20.04]
-                    cxx: [g++-9, g++-10, clang++-9, clang++-11]
-                    include :
-                        - os: "macos-latest"
-                          cxx: "clang++"
+                os: [ ubuntu-20.04 ]
+                cxx: [ g++-9, g++-10, clang++-9, clang++-11 ]
+                include :
+                    - os: "macos-latest"
+                      cxx: "clang++"
         env:
-            CXX: $${{ matrix.config.cxx }}
+            CXX: ${{ matrix.cxx }}
         steps:
             - uses: actions/checkout@v1
               with:
