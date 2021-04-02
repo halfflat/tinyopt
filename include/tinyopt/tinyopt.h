@@ -108,6 +108,7 @@ struct maybe<void> {
     constexpr maybe(nothing_t&) noexcept: ok(false) {}
     constexpr maybe(const nothing_t&) noexcept: ok(false) {}
     constexpr maybe(nothing_t&&) noexcept: ok(false) {}
+    constexpr maybe(const maybe<void>& m) noexcept: ok(m.ok) {}
 
     template <typename X, typename = std::enable_if_t<!is_maybe<X>::value>>
     constexpr maybe(X&&) noexcept: ok(true) {}
