@@ -12,7 +12,7 @@ const char* usage_str =
     "\n"
     "Throw away --apple options and report remaining arguments.\n";
 
-int main(int argc, char** argv) {
+int main(int, char** argv) {
     try {
         std::vector<std::string> remaining;
         auto print_apple = [] { std::cout << "apple!\n"; };

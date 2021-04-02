@@ -148,7 +148,7 @@ TEST(option, modals) {
 
 TEST(option, run) {
     using namespace to::literals;
-    int a, b, c, d;
+    int a, c, d;
     std::string e;
 
     to::option opt_a{a, to::single, "-a", "--arg"};

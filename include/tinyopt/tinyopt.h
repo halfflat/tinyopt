@@ -68,7 +68,7 @@ struct maybe {
     bool has_value() const noexcept { return ok; }
     explicit operator bool() const noexcept { return ok; }
 
-    template <typename> friend class maybe;
+    template <typename> friend struct maybe;
 
 private:
     bool ok = false;
@@ -118,7 +118,7 @@ struct maybe<void> {
     maybe& operator=(nothing_t) noexcept { return ok = false, *this; }
     maybe& operator=(const maybe& m) noexcept { return ok = m.ok, *this; }
     template <typename U>
-    maybe& operator=(U&& v) noexcept { return ok = true, *this; }
+    maybe& operator=(U&&) noexcept { return ok = true, *this; }
 
     bool has_value() const noexcept { return ok; }
     constexpr explicit operator bool() const noexcept { return ok; }
@@ -272,7 +272,7 @@ struct default_parser<std::string> {
 
 template <>
 struct default_parser<void> {
-    maybe<void> operator()(const char* text) const {
+    maybe<void> operator()(const char*) const {
         return something;
     }
 };
@@ -563,7 +563,7 @@ struct sink {
     static struct action_t {} action;
 
     sink():
-        sink(action, [](const char* param) { return true; })
+        sink(action, [](const char*) { return true; })
     {}
 
     template <typename V>

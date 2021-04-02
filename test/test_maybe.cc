@@ -10,8 +10,8 @@ TEST(maybe, something) {
     EXPECT_TRUE(s.has_value());
 
     constexpr auto n = nothing;
-    EXPECT_FALSE(maybe<int>(nothing));
-    EXPECT_FALSE(maybe<int>(nothing).has_value());
+    EXPECT_FALSE(maybe<int>(n));
+    EXPECT_FALSE(maybe<int>(n).has_value());
 }
 
 TEST(maybe, noexcept) {

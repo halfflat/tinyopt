@@ -9,7 +9,7 @@ const char* usage_str =
     "  -f, --function=FUNC  Perform FUNC, which is one of: one, two\n"
     "  -h, --help           Display usage information and exit\n";
 
-int main(int argc, char** argv) {
+int main(int, char** argv) {
     try {
         int n = 1, fn = 0;
         bool help = false;
