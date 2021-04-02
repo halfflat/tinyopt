@@ -18,9 +18,8 @@ gtest-src:=$(gtest-top)/src/gtest-all.cc
 vpath %.cc $(top)test
 vpath %.cc $(top)ex
 
-#OPTFLAGS?=-O3 -march=native
-OPTFLAGS?=-O0 -fsanitize=address
-CXXFLAGS+=$(OPTFLAGS) -MMD -MP -std=c++14 -g -pthread
+OPTFLAGS?=-O2 -fsanitize=address -march=native
+CXXFLAGS+=$(OPTFLAGS) -MMD -MP -std=c++14 -pedantic -Wall -Wextra -g -pthread
 CPPFLAGS+=-isystem $(gtest-inc) -I $(top)include
 
 depends:=$(patsubst %.cc, %.d, $(all-src)) gtest.d

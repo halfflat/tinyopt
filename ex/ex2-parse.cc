@@ -10,7 +10,7 @@ const char* usage_str =
     "  --sum=N1,..,Nk   Sum the integers N1 through Nk.\n"
     "  -h, --help       Display usage information and exit\n";
 
-int main(int argc, char** argv) {
+int main(int, char** argv) {
     try {
         std::vector<int> x;
         bool help = false;
