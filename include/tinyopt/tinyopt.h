@@ -251,8 +251,9 @@ struct default_parser {
         if (!text) return nothing;
         V v;
         std::istringstream stream(text);
-        stream >> v >> std::ws;
-        return stream && stream.get()==EOF? maybe<V>(v): nothing;
+        if (!(stream >> v)) return nothing;
+	if (!stream.eof()) stream >> std::ws;
+	return stream.eof()? maybe<V>(v): nothing;
     }
 };
 
