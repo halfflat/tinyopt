@@ -8,7 +8,8 @@ const char* usage_str =
     "[OPTION]... [ARGUMENT]...\n"
     "\n"
     "  -a, --apple    Print 'apple' but otherwise ignore.\n"
-    "  -h, --help     Display usage information and exit\n"
+    "  --             Stop further argument processing.\n"
+    "  -h, --help     Display usage information and exit.\n"
     "\n"
     "Throw away --apple options and report remaining arguments.\n";
 
@@ -17,11 +18,14 @@ int main(int argc, char** argv) {
         std::vector<std::string> remaining;
         auto print_apple = [] { std::cout << "apple!\n"; };
         bool help = false;
+        bool stop = false;
 
-        for (auto arg = argv+1; *arg; ) {
+        char** arg = argv+1;
+        while (*arg && !help && !stop) {
             bool match =
                 help        << to::parse(arg, "-h", "--help") ||
-                print_apple << to::parse(arg, "-a", "--apple");
+                print_apple << to::parse(arg, "-a", "--apple") ||
+                stop        << to::parse(arg, "--");
 
             if (!match) remaining.push_back(*arg++);
         }
@@ -30,6 +34,9 @@ int main(int argc, char** argv) {
             to::usage(argv[0], usage_str);
             return 0;
         }
+
+        // Grab any remaining unprocessed arguments, too.
+        while (*arg) remaining.push_back(*arg++);
 
         std::cout << "remaining arguments:";
         for (auto& a: remaining) std::cout << ' ' << a;

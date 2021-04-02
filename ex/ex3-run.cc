@@ -8,7 +8,8 @@ const char* usage_str =
     "[OPTION]... [ARGUMENT]...\n"
     "\n"
     "  -a, --apple    Print 'apple' but otherwise ignore.\n"
-    "  -h, --help     Display usage information and exit\n"
+    "  --             Stop further argument processing.\n"
+    "  -h, --help     Display usage information and exit.\n"
     "\n"
     "Throw away --apple options and report remaining arguments.\n";
 
@@ -19,7 +20,8 @@ int main(int argc, char** argv) {
 
         to::option opts[] = {
             { to::action(print_apple), to::flag, "-a", "--apple" },
-            { to::action(help), to::flag, to::exit, "-h", "--help" }
+            { to::action(help), to::flag, to::exit, "-h", "--help" },
+            { {}, to::flag, to::stop, "--" }
         };
 
         if (!to::run(opts, argc, argv+1)) return 0;
