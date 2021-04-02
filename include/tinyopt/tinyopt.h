@@ -724,7 +724,8 @@ enum option_flag {
     ephemeral = 2,  // Option is not saved in returned results.
     single = 4,     // Option is parsed at most once.
     mandatory = 8,  // Option must be present in argument list.
-    exit = 16,      // Option stops further argument processing.
+    exit = 16,      // Option stops further argument processing, return `nothing` from run().
+    stop = 32,      // Option stops further argument processing, return saved options.
 };
 
 struct option {
@@ -738,6 +739,7 @@ struct option {
     bool is_single = false;
     bool is_mandatory = false;
     bool is_exit = false;
+    bool is_stop = false;
 
     template <typename... Rest>
     option(sink s, Rest&&... rest): s(std::move(s)) {
@@ -786,6 +788,7 @@ private:
         is_single    |= f & single;
         is_mandatory |= f & mandatory;
         is_exit      |= f & exit;
+        is_stop      |= f & stop;
         init_(std::forward<Rest>(rest)...);
     }
 
@@ -983,9 +986,10 @@ namespace impl {
     inline maybe<saved_options> run(std::vector<impl::counted_option>& opts, int& argc, char** argv) {
         saved_options collate;
         bool exit = false;
+        bool stop = false;
         state st{argc, argv};
         int mode = 0;
-        while (st && !exit) {
+        while (st && !exit && !stop) {
             // Try options with a key first.
             for (auto& o: opts) {
                 if (o.keys.empty()) continue;
@@ -999,6 +1003,7 @@ namespace impl {
                     }
                     o.set_mode(mode);
                     exit = o.is_exit;
+                    stop = o.is_stop;
                     goto next;
                 }
             }

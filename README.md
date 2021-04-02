@@ -454,8 +454,18 @@ Option behaviour can be modified by supplying `enum option_flag` values:
 * `single` — This option will be checked at most once, and then ignored for the remainder of option processing.
 * `mandatory` — Throw an exception if this option does not appear in the command line arguments.
 * `exit` — On successful parsing of this option, stop any further option processing and return `nothing` from `run()`.
+* `stop` — On successful parsing of this option, stop any further option processing but return saved options as normal from `run()`.
 
 These enum values are all powers of two and can be combined via bitwise or `|`.
+
+When to use `exit`, and when to use `stop`? `exit` is intended to describe
+the situation where the program should not proceed further with normal
+processing; a standard use case for `exit` is for `--help` options, which
+should cause the program to exit after printing help text. `stop`, on the
+other hand, is used for options that indicate that no further special
+argument processing should be performed; this corresponds to the common
+convention of `--` on the command line indicating that all remaining
+arguments should be interpreted as command line options.
 
 #### Specifying an option
 
@@ -534,7 +544,6 @@ In the following `Options` is any iterable collection of `option` values.
    Parse the items in `argv` against the options provided in the first argument.
    Starting at the beginning of the `argv` list, options with keys are checked first,
    in the order they appear in `options`, followed by options without keys.
-   An item `--` in `argv` stops any further processing of options.
 
    Successfully parsed options are removed from the `argv` list in-place, and
    `argc` is adjusted accordingly.

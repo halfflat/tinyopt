@@ -36,6 +36,8 @@ manually. When using `to::run`, however, the argument list will
 be modified in place, removing matched options.
 
 The two approaches are exemplified in `ex3-parse` and `ex3-run`.
+Note the use of `to::stop` in `ex3-run` for implementing the
+option `--`.
 
 ## Example 4 — compact options
 
