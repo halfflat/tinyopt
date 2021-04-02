@@ -13,25 +13,25 @@ const char* usage_str =
 int main(int argc, char** argv) {
     try {
         std::vector<int> x;
-	bool help = false;
+        bool help = false;
 
-	for (auto arg = argv+1; *arg; ) {
+        for (auto arg = argv+1; *arg; ) {
             bool ok =
-	        help << to::parse(arg, 'h', "help") ||
-	        x    << to::parse<std::vector<int>>(arg, 0, "sum", to::delimited<int>());
+                help << to::parse(arg, "-h", "--help") ||
+                x    << to::parse<std::vector<int>>(arg, to::delimited<int>(), "--sum");
 
-	    if (!ok) throw to::option_error("unrecognized argument", *arg);
-	}
+            if (!ok) throw to::option_error("unrecognized argument", *arg);
+        }
 
-	if (help) {
-	    to::usage(argv[0], usage_str);
-	    return 0;
-	}
+        if (help) {
+            to::usage(argv[0], usage_str);
+            return 0;
+        }
 
         std::cout << std::accumulate(x.begin(), x.end(), 0) << "\n";
     }
     catch (to::option_error& e) {
-	to::usage(argv[0], usage_str, e.what());
-	return 1;
+        to::usage_error(argv[0], usage_str, e.what());
+        return 1;
     }
 }

@@ -3,7 +3,7 @@
 #include <string>
 #include <utility>
 
-#include <tinyopt/smolopt.h>
+#include <tinyopt/tinyopt.h>
 
 const char* usage_str =
     "[OPTION]...\n"
@@ -26,18 +26,18 @@ int main(int argc, char** argv) {
         bool one = false, two = false, three = false;
         std::string save_file;
 
-	to::option opts[] = {
-	    { to::increment(a), to::flag, "-a"_compact },
-	    { to::increment(b), to::flag, "-b"_compact },
-	    { to::increment(c), to::flag, "-c"_compact },
-	    { to::set(one),     to::flag, "set/one"_compact },
-	    { to::set(two),     to::flag, "set/two"_compact },
-	    { to::set(three),   to::flag, "set/three"_compact },
-	    { save_file,        to::ephemeral, "--save" },
-	    { to::action(help), to::flag, to::exit, "-h", "--help" }
-	};
+        to::option opts[] = {
+            { to::increment(a), to::flag, "-a"_compact },
+            { to::increment(b), to::flag, "-b"_compact },
+            { to::increment(c), to::flag, "-c"_compact },
+            { to::set(one),     to::flag, "set/one"_compact },
+            { to::set(two),     to::flag, "set/two"_compact },
+            { to::set(three),   to::flag, "set/three"_compact },
+            { save_file,        to::ephemeral, "--save" },
+            { to::action(help), to::flag, to::exit, "-h", "--help" }
+        };
 
-	auto saved = to::run(opts, argc, argv);
+        auto saved = to::run(opts, argc, argv);
         if (!saved) return 0;
 
         if (!save_file.empty()) {
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
         if (three) std::cout << "set/three\n";
     }
     catch (to::option_error& e) {
-	to::usage(argv[0], usage_str, e.what());
-	return 1;
+        to::usage_error(argv[0], usage_str, e.what());
+        return 1;
     }
 }

@@ -3,8 +3,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include <tinyopt/smolopt.h>
+#include <tinyopt/tinyopt.h>
 
 using svector = std::vector<std::string>;
 

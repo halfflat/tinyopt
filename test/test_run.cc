@@ -3,9 +3,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include <tinyopt/smolopt.h>
-
+#include <tinyopt/tinyopt.h>
 #include "mockargs.h"
 
 using namespace std::literals;

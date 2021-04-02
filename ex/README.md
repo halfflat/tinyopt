@@ -1,4 +1,4 @@
-# Tinyopt and smolopt examples
+# Tinyopt examples
 
 ## Example 1 — basic demo
 
@@ -11,35 +11,31 @@ This example incorporates three options/flags:
 
 3. The `-h`/`--help` flag causes the program to print help information and exit.
 
-Both implementations, `ex1-tiny` and `ex1-smol` use `to::usage()` to handle
+Both implementations, `ex1-parse` and `ex1-run` use `to::usage()` to handle
 option-related errors and to print help information.
 
-The tinyopt implementation, `ex1-tiny` handles the `--help` option via
+The `to::parse` implementation, `ex1-parse` handles the `--help` option via
 a boolean flag, and checks explicitly that the `--function` option is provided.
-In contrast, the smallopt version uses an _action_ to handle the help function,
+In contrast, the `to::run` version uses an _action_ to handle the help function,
 and the `--function` option is given the `to::mandatory` flag.
 
-Note the use of `to::exit` in the `--help` option in `ex1-smol`: this
+Note the use of `to::exit` in the `--help` option in `ex1-run`: this
 stops further option processing, and causes `to::run` to return an
 empty `maybe` value.
 
 ## Example 2 — delimited values
 
 This demonstrates the use of the delimited parser to parse a comma-separated
-list of integers.
-
-The numbers are given as the argument to the option `--sum`; in `ex2-tiny`
-a zero is given in the short-name field of `to::parse` to indicate there
-is no short version of this option.
+list of integers. The numbers are given as the argument to the option `--sum`.
 
 ## Example 3 — remaining arguments
 
-As the basic interface requires the code to go through each
+As the `to::parse` interface requires the code to go through each
 command line argument in turn, non-option arguments can be collated
 manually. When using `to::run`, however, the argument list will
 be modified in place, removing matched options.
 
-The two approaches are exemplified in `ex3-tiny` and `ex3-smol`.
+The two approaches are exemplified in `ex3-parse` and `ex3-run`.
 
 ## Example 4 — compact options
 
@@ -54,7 +50,7 @@ any values.
 
 As an example, the options `set/one` `set/two` and `set/three` can be combined as:
 ```
-% ex4-smol set/one/two/three
+% ex4-run set/one/two/three
 set/one
 set/two
 set/three
@@ -63,12 +59,12 @@ set/three
 This example also shows how the saved option data can be used to
 replay previous command line invocations, e.g.
 ```
-% ex4-smol --save saved.opt -aab
+% ex4-run --save saved.opt -aab
 a=2
 b=1
 # cat saved.opt
 -a -a -b
-% ex4-smol -c $(<saved.opt)
+% ex4-run -c $(<saved.opt)
 a=2
 b=1
 c=1
@@ -79,7 +75,7 @@ c=1
 Specifying `to::when` and `to::then` in an option allows for
 modal behaviour when parsing the command line arguments.
 
-In `ex5-smol`, the flag "echo" on the command line causes the
+In `ex5-run`, the flag "echo" on the command line causes the
 program to emit the following words one per line, while "ohce",
 in turn, causes the following words to be emitted backwards.
 
@@ -88,13 +84,13 @@ that will cause a `to::user_option_error` to be thrown.
 
 Sample run:
 ```
-% ex5-smol hello
-ex5-smol: unrecognized keyword
-Usage: ex5-smol [echo [word...] | ohce [word...]] ...
+% ex5-run hello
+ex5-run: unrecognized keyword
+Usage: ex5-run [echo [word...] | ohce [word...]] ...
 
 Print words afer 'echo' one per line;
 Print words after 'oche' backwards, one per line.
-% ex5-smol echo how now ohce brown echo cow
+% ex5-run echo how now ohce brown echo cow
 how
 now
 nworb
