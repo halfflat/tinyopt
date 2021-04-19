@@ -1,4 +1,4 @@
-.PHONY: clean all examples
+.PHONY: all clean realclean
 .SECONDARY:
 
 top:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
