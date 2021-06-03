@@ -71,7 +71,7 @@ a=2
 b=1
 c=1
 ```
- 
+
 ## Example 5 — modal options
 
 Specifying `to::when` and `to::then` in an option allows for
@@ -97,5 +97,4 @@ how
 now
 nworb
 cow
-```
 ```
