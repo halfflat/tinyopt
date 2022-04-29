@@ -11,11 +11,14 @@ jobs:
             matrix:
                 os: [ ubuntu-20.04 ]
                 cxx: [ g++-9, g++-10, clang++-10, clang++-11 ]
+                cxxstd: [ c++14, c++17 ]
                 include :
                     - os: "macos-latest"
                       cxx: "clang++"
+                      cxxstd: "c++14"
         env:
             CXX: ${{ matrix.cxx }}
+            CXXSTD: ${{ matrix.cxxstd }}
         steps:
             - uses: actions/checkout@v1
               with:
@@ -25,7 +28,7 @@ jobs:
                   ${CXX} --version
                   mkdir build
                   cd build
-                  make -j4 -f ../Makefile
+                  make -j4 CXXSTD=${CXXSTD} -f ../Makefile
             - name: Run unit tests.
               run: build/unit
 

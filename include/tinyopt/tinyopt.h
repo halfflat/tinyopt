@@ -12,6 +12,10 @@
 #include <type_traits>
 #include <vector>
 
+#if __cplusplus>=201703
+#include <optional>
+#endif
+
 #define TINYOPT_VERSION "1.0"
 #define TINYOPT_VERSION_MAJOR 1
 #define TINYOPT_VERSION_MINOR 0
@@ -259,8 +263,8 @@ struct default_parser {
         V v;
         std::istringstream stream(text);
         if (!(stream >> v)) return nothing;
-	if (!stream.eof()) stream >> std::ws;
-	return stream.eof()? maybe<V>(v): nothing;
+        if (!stream.eof()) stream >> std::ws;
+        return stream.eof()? maybe<V>(v): nothing;
     }
 };
 
@@ -576,6 +580,13 @@ struct sink {
 
     template <typename V>
     sink(V& var): sink(var, default_parser<V>{}) {}
+
+#if __cplusplus>=201703
+    template <typename V>
+    sink(std::optional<V>& var): sink(var, default_parser<V>{}) {}
+#endif
+    template <typename V>
+    sink(maybe<V>& var): sink(var, default_parser<V>{}) {}
 
     template <typename V, typename P>
     sink(V& var, P parser):
