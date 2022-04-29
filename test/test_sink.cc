@@ -1,6 +1,10 @@
 #include <cstdlib>
 #include <string>
 
+#if __cplusplus>=201703
+#include <optional>
+#endif
+
 #include <gtest/gtest.h>
 #include <tinyopt/tinyopt.h>
 
@@ -22,7 +26,33 @@ TEST(sink, refctor) {
     to::sink sb(a, [](const char*) { return to::just(17); });
     EXPECT_TRUE(sb("foo"));
     EXPECT_EQ(17, a);
+
+    to::maybe<int> ma;
+    to::sink sma(ma);
+
+    ASSERT_FALSE(ma);
+    EXPECT_FALSE(sma("foo"));
+    EXPECT_FALSE(ma);
+
+    EXPECT_TRUE(sma("312"));
+    EXPECT_TRUE(ma);
+    EXPECT_EQ(*ma, 312);
 }
+
+#if __cplusplus>=201703
+TEST(sink, optionalrefctor) {
+    std::optional<int> oa;
+    to::sink soa(oa);
+
+    ASSERT_FALSE(oa);
+    EXPECT_FALSE(soa("foo"));
+    EXPECT_FALSE(oa);
+
+    EXPECT_TRUE(soa("312"));
+    EXPECT_TRUE(oa);
+    EXPECT_EQ(*oa, 312);
+}
+#endif
 
 TEST(sink, action_explicit) {
     char x;
