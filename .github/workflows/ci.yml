@@ -10,7 +10,7 @@ jobs:
         strategy:
             matrix:
                 os: [ ubuntu-22.04 ]
-                cxx: [ g++-10, g++-11, clang++-10, clang++-16 ]
+                cxx: [ g++-10, g++-13, clang++-13, clang++-15 ]
                 cxxstd: [ c++14, c++17, c++20 ]
                 include:
                     - os: "macos-latest"
