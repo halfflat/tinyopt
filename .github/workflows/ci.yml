@@ -9,10 +9,10 @@ jobs:
         runs-on: ${{ matrix.os }}
         strategy:
             matrix:
-                os: [ ubuntu-20.04 ]
-                cxx: [ g++-9, g++-10, clang++-10, clang++-11 ]
-                cxxstd: [ c++14, c++17 ]
-                include :
+                os: [ ubuntu-22.04 ]
+                cxx: [ g++-10, g++-13, clang++-13, clang++-15 ]
+                cxxstd: [ c++14, c++17, c++20 ]
+                include:
                     - os: "macos-latest"
                       cxx: "clang++"
                       cxxstd: "c++14"
