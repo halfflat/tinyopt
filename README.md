@@ -146,7 +146,7 @@ Tinyopt is a header-only library, but the supplied Makefile will build the unit
 tests and examples.
 
 The Makefile is designed to support out-of-tree building, and the recommended
-approach is to create a build directory, symbolicly link the project Makefile
+approach is to create a build directory, symbolically link the project Makefile
 into the directory, and build from there. For example, to check out, build the
 tests and examples, and then run the unit tests:
 ```
@@ -223,7 +223,7 @@ An alternative prefix to "Usage: " can be supplied optionally.
 A parser is a function or functional object with signature `maybe<X> (const char*)`
 for some type `X`. They are used to try to convert a C-string argument into a value.
 
-If no explicit parser is given to a the`parse` function or to an `option` specification,
+If no explicit parser is given to the`parse` function or to an `option` specification,
 the default parser `default_parser` is used, which will use `std::istream::operator>>`
 to read the supplied argument.
 
@@ -269,7 +269,7 @@ following the key with an equals sign and then the argument value.
 
 As an example, let "-s" be a short option key, "--long" a long option key,
 "-a" a compact option key for a flag, and "-b" a compact option key for
-an option that takes a value. Then the follwing are equivalent ways
+an option that takes a value. Then the following are equivalent ways
 for specifying these options on a command line:
 
 ```
@@ -325,7 +325,7 @@ option argument with the default or explicitly provided parser.
    supplied, use the default parser for the type `V` to convert the option
    argument.
 
-   If the match and value pase is successful, increment `argp` once or twice
+   If the match and value parse is successful, increment `argp` once or twice
    as required to advance to the next option.
 
 The `parse` functions will throw `missing_argument` if no argument is found
@@ -465,7 +465,7 @@ should cause the program to exit after printing help text. `stop`, on the
 other hand, is used for options that indicate that no further special
 argument processing should be performed; this corresponds to the common
 convention of `--` on the command line indicating that all remaining
-arguments should be interpreted as command line options.
+arguments should not be interpreted as command line options.
 
 #### Specifying an option
 
