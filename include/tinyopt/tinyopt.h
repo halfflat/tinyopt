@@ -453,6 +453,8 @@ struct state {
 
     // Shift arguments left in-place.
     void shift(unsigned n = 1) {
+        if (!n) return;
+
         char** skip = argv;
         while (*skip && n) ++skip, --n;
 
@@ -468,33 +470,36 @@ struct state {
          if (*argv) ++argv;
     }
 
+    struct match_result {
+        const char* argument = nullptr;
+        unsigned shift = 0;
+        unsigned offset = 0;
+    };
+
+    void consume(const match_result& mr) {
+        shift(mr.shift);
+        optoff += mr.offset;
+    }
+
     // Match an option given by the key which takes an argument.
     // If successful, consume option and argument and return pointer to
     // argument string, else return nothing.
-    maybe<const char*> match_option(const key& k) {
-        const char* p = nullptr;
-
+    maybe<match_result> match_option(const key& k) {
         if (k.style==key::compact) {
-            if ((p = match_compact_key(k.label.c_str()))) {
-                if (!*p) {
-                    p = argv[1];
-                    shift(2);
-                }
-                else shift();
-                return p;
+            if (auto m = match_compact_key(k.label.c_str())) {
+                if (*argv[optoff+*m])
+                    return match_result{*argv+optoff+*m, 1, 0};
+                else
+                    return match_result{argv[1], 2, 0};
             }
         }
         else if (!optoff && k.label==*argv) {
-            p = argv[1];
-            shift(2);
-            return p;
+            return match_result{argv[1], 2, 0};
         }
         else if (!optoff && k.style==key::longfmt) {
             auto keylen = k.label.length();
             if (!std::strncmp(*argv, k.label.c_str(), keylen) && (*argv)[keylen]=='=') {
-                p = &(*argv)[keylen+1];
-                shift();
-                return p;
+                return match_result{*argv+keylen+1, 1, 0};
             }
         }
 
@@ -502,37 +507,40 @@ struct state {
     }
 
     // Match a flag given by the key.
-    // If successful, consume flag and return true, else return false.
-    bool match_flag(const key& k) {
+    // If successful, consume match_result with nullptr for option argvument.
+    maybe<match_result> match_flag(const key& k) {
         if (k.style==key::compact) {
-            if (auto p = match_compact_key(k.label.c_str())) {
-                if (!*p) shift();
-                return true;
+            if (auto m = match_compact_key(k.label.c_str())) {
+                if (*argv[optoff+*m]) 
+                    return match_result{nullptr, 0, *m};
+                else
+                    return match_result{nullptr, 1, 0};
             }
         }
         else if (!optoff && k.label==*argv) {
-            shift();
-            return true;
+            return match_result{nullptr, 1, 0};
         }
 
-        return false;
+        return nothing;
     }
 
     // Compact-style keys can be combined in one argument; combined keys
     // with a common prefix only need to supply the prefix once at the
     // beginning of the argument.
-    const char* match_compact_key(const char* k) {
+    //
+    // On success returns number of characters constituting the compact key.
+    maybe<unsigned> match_compact_key(const char* k) {
         unsigned keylen = std::strlen(k);
 
         unsigned prefix_max = std::min(keylen-1, optoff);
         for (std::size_t l = 0; l<=prefix_max; ++l) {
             if (l && strncmp(*argv, k, l)) break;
             if (strncmp(*argv+optoff, k+l, keylen-l)) continue;
-            optoff += keylen-l;
-            return *argv+optoff;
+
+            return keylen-l;
         }
 
-        return nullptr;
+        return nothing;
     }
 };
 
@@ -601,7 +609,6 @@ struct sink {
 
     bool operator()(const char* param) const { return op(param); }
     std::function<bool (const char*)> op;
-
 };
 
 // Convenience functions for construction of sink actions
@@ -743,6 +750,7 @@ enum option_flag {
     mandatory = 8,  // Option must be present in argument list.
     exit = 16,      // Option stops further argument processing, return `nothing` from run().
     stop = 32,      // Option stops further argument processing, return saved options.
+    lax = 64,       // Option does not throw an error if argument fails to parse or is missing.
 };
 
 struct option {
@@ -757,6 +765,7 @@ struct option {
     bool is_mandatory = false;
     bool is_exit = false;
     bool is_stop = false;
+    bool is_lax = false;
 
     template <typename... Rest>
     option(sink s, Rest&&... rest): s(std::move(s)) {
@@ -782,9 +791,11 @@ struct option {
         for (auto& f: modals) mode = f(mode);
     }
 
-    void run(const std::string& label, const char* arg) const {
-        if (!is_flag && !arg) throw missing_argument(label);
-        if (!s(arg)) throw option_parse_error(label);
+    // Returns false (if lax) or throws on argument error.
+    bool run(const std::string& label, const char* arg) const {
+        if (!is_flag && !arg) return is_lax? false: throw missing_argument(label);
+        if (!s(arg)) return is_lax? false: throw option_parse_error(label);
+        return true;
     }
 
     std::string longest_label() const {
@@ -806,6 +817,7 @@ private:
         is_mandatory |= f & mandatory;
         is_exit      |= f & exit;
         is_stop      |= f & stop;
+        is_lax       |= f & lax;
         init_(std::forward<Rest>(rest)...);
     }
 
@@ -826,7 +838,6 @@ private:
         keys.push_back(std::move(k));
         init_(std::forward<Rest>(rest)...);
     }
-
 };
 
 // Saved options
@@ -947,39 +958,33 @@ namespace impl {
 
         counted_option(const option& o): option(o) {}
 
-        // On successful match, return pointers to matched key and value.
-        // For flags, use nullptr for value; for empty key sets, use
+        // On successful match, return pointers to matched key and argumnent.
+        // For flags, use nullptr for argumnent; for empty key sets, use
         // nullptr for key.
-        maybe<std::pair<const char*, const char*>> match(state& st) {
+        typedef maybe<std::pair<const char*, const char*>> maybe_keyarg;
+        maybe_keyarg match(state& st) {
+            bool empty_keyset = keys.empty();
+
+            auto try_run = [&](const std::string& label, const state::match_result& mr) -> maybe_keyarg {
+                if (run(label, mr.argument)) {
+                    st.consume(mr);
+                    ++count;
+                    return std::make_pair(empty_keyset? nullptr: label.c_str(), mr.argument);
+                }
+                return nothing;
+            };
+
             if (is_flag) {
-                for (auto& k: keys) {
-                    if (st.match_flag(k)) return set(k.label, nullptr);
-                }
-                return nothing;
+                for (auto& k: keys) if (auto m = st.match_flag(k)) return try_run(k.label, *m);
             }
-            else if (!keys.empty()) {
-                for (auto& k: keys) {
-                    if (auto param = st.match_option(k)) return set(k.label, *param);
-                }
-                return nothing;
+            else if (!empty_keyset) {
+                for (auto& k: keys) if (auto m = st.match_option(k)) return try_run(k.label, *m);
             }
             else {
-                const char* param = *st.argv;
-                st.shift();
-                return set("", param);
+                return try_run("", state::match_result{*st.argv, 1, 0});
             }
-        }
 
-        std::pair<const char*, const char*> set(const char* arg) {
-            run("", arg);
-            ++count;
-            return {nullptr, arg};
-        }
-
-        std::pair<const char*, const char*> set(const std::string& label, const char* arg) {
-            run(label, arg);
-            ++count;
-            return {label.c_str(), arg};
+            return nothing;
         }
     };
 } // namespace impl
