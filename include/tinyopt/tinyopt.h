@@ -487,7 +487,7 @@ struct state {
     maybe<match_result> match_option(const key& k) {
         if (k.style==key::compact) {
             if (auto m = match_compact_key(k.label.c_str())) {
-                if (*argv[optoff+*m])
+                if ((*argv)[optoff+*m])
                     return match_result{*argv+optoff+*m, 1, 0};
                 else
                     return match_result{argv[1], 2, 0};
@@ -511,7 +511,7 @@ struct state {
     maybe<match_result> match_flag(const key& k) {
         if (k.style==key::compact) {
             if (auto m = match_compact_key(k.label.c_str())) {
-                if (*argv[optoff+*m]) 
+                if ((*argv)[optoff+*m]) 
                     return match_result{nullptr, 0, *m};
                 else
                     return match_result{nullptr, 1, 0};
