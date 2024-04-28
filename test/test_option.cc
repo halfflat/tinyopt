@@ -47,8 +47,8 @@ TEST(key, literal) {
 
 TEST(option, ctor) {
     using namespace to::literals;
-    int a, b, c, d, e, f;
-    std::string g;
+    int a, b, c, d, e, f, g;
+    std::string h;
 
     to::option opts[] = {
         {a, to::ephemeral, to::single, "-a", "--arg"},
@@ -57,28 +57,33 @@ TEST(option, ctor) {
         {to::action([&d](int) {++d;}), "-d"_compact},
         {e, to::flag, to::when(3), to::then(4), "-a"},
         {f, to::then(17), to::then([](int k) { return k+1; }), "-a"},
-        {g},
+        {g, "-g", to::lax, "--gee"},
+        {h},
     };
 
     EXPECT_FALSE(opts[0].is_flag);
     EXPECT_TRUE(opts[0].is_ephemeral);
     EXPECT_TRUE(opts[0].is_single);
     EXPECT_FALSE(opts[0].is_mandatory);
+    EXPECT_FALSE(opts[0].is_lax);
 
     EXPECT_FALSE(opts[1].is_flag);
     EXPECT_FALSE(opts[1].is_ephemeral);
     EXPECT_FALSE(opts[1].is_single);
     EXPECT_TRUE(opts[1].is_mandatory);
+    EXPECT_FALSE(opts[1].is_lax);
 
     EXPECT_TRUE(opts[2].is_flag);
     EXPECT_FALSE(opts[2].is_ephemeral);
     EXPECT_FALSE(opts[2].is_single);
     EXPECT_FALSE(opts[2].is_mandatory);
+    EXPECT_FALSE(opts[2].is_lax);
 
     EXPECT_FALSE(opts[3].is_flag);
     EXPECT_FALSE(opts[3].is_ephemeral);
     EXPECT_FALSE(opts[3].is_single);
     EXPECT_FALSE(opts[3].is_mandatory);
+    EXPECT_FALSE(opts[3].is_lax);
 
     EXPECT_TRUE(opts[4].is_flag);
     EXPECT_EQ(1u, opts[4].filters.size());
@@ -86,6 +91,8 @@ TEST(option, ctor) {
 
     EXPECT_EQ(0u, opts[5].filters.size());
     EXPECT_EQ(2u, opts[5].modals.size());
+
+    EXPECT_TRUE(opts[6].is_lax);
 
     using svec = std::vector<std::string>;
     auto key_labels = [](const to::option& o) {
@@ -96,7 +103,8 @@ TEST(option, ctor) {
 
     EXPECT_EQ((svec{"-a", "--arg"}), key_labels(opts[0]));
     EXPECT_EQ((svec{"-d"}), key_labels(opts[3]));
-    EXPECT_EQ((svec{}), key_labels(opts[6]));
+    EXPECT_EQ((svec{"-g", "--gee"}), key_labels(opts[6]));
+    EXPECT_EQ((svec{}), key_labels(opts[7]));
 }
 
 TEST(option, longest_label) {
@@ -150,25 +158,48 @@ TEST(option, run) {
     using namespace to::literals;
     int a, c, d;
     std::string e;
+    bool rv = false;
 
     to::option opt_a{a, to::single, "-a", "--arg"};
-    ASSERT_NO_THROW(opt_a.run("-a", "3"));
+    ASSERT_NO_THROW((rv = opt_a.run("-a", "3")));
+    EXPECT_TRUE(rv);
     EXPECT_EQ(a, 3);
-    ASSERT_THROW(opt_a.run("-a", "fish"), to::option_parse_error);
+    ASSERT_THROW((rv = opt_a.run("-a", "fish")), to::option_parse_error);
+    EXPECT_TRUE(rv);
+
+    to::option opt_a_lax{a, to::single, "-a", "--arg", to::lax};
+    rv = true;
+    a = 5;
+    ASSERT_NO_THROW((rv = opt_a_lax.run("-a", "fish")));
+    EXPECT_FALSE(rv);
 
     c = 1;
     to::option opt_c{to::increment(c), to::flag, "-c", "--cat"};
-    ASSERT_NO_THROW(opt_c.run("-c", nullptr));
+    rv = false;
+    ASSERT_NO_THROW((rv = opt_c.run("-c", nullptr)));
     EXPECT_EQ(c, 2);
+    EXPECT_TRUE(rv);
+
+    c = 1;
+    to::option opt_c_lax{to::increment(c), to::flag, "-c", "--cat"};
+    rv = false;
+    ASSERT_NO_THROW((rv = opt_c_lax.run("-c", nullptr)));
+    EXPECT_EQ(c, 2);
+    EXPECT_TRUE(rv);
 
     d = 3;
     to::option opt_d{to::action([&d](int) {++d;}), "-d"_compact};
-    ASSERT_NO_THROW(opt_d.run("-d", "7"));
+    rv = false;
+    ASSERT_NO_THROW((rv = opt_d.run("-d", "7")));
+    EXPECT_TRUE(rv);
     EXPECT_EQ(d, 4);
-    ASSERT_THROW(opt_d.run("-d", "fish"), to::option_parse_error);
+    ASSERT_THROW((rv = opt_d.run("-d", "fish")), to::option_parse_error);
+    EXPECT_TRUE(rv);
 
     to::option opt_e{e};
-    ASSERT_NO_THROW(opt_e.run("", "bauble"));
+    rv = false;
+    ASSERT_NO_THROW((rv = opt_e.run("", "bauble")));
+    EXPECT_TRUE(rv);
     EXPECT_EQ("bauble", e);
 }
 

@@ -24,7 +24,7 @@ Non-features:
   This is due to laziness. But it does try to at least not break UTF-8.
 * _Does not automatically generate help/usage text._
   What constitutes good help output is too specific to any given program.
-* _Does not support optional or multiple arguments to an option._
+* _Does not support multiple arguments to an option._
   This is mainly due to problems of ambiguous parsing, though in a pinch this can
   be set up through the use of modal option parsing (see _Filters and Modals_ below).
 
@@ -186,8 +186,8 @@ that contains a value, or by any other value that is not `nothing`. `something`
 is a pre-defined non-empty value of type `maybe<void>`.
 
 `maybe<V>` values support basic monadic-like functionality via `operator<<`.
-* If `x` is an lvalue and `m` is of type `maybe<U>`, then 
-  `x << m` has type `maybe<V>` (`V` is the type of `x=*m`) and assigns `m.value()` to `x`
+* If `x` is an lvalue and `m` is of type `maybe<U>`, then
+  `x << m` has type `maybe<V>` where `V` is the type of `x=*m` and assigns `m.value()` to `x`
   if `m` has a value. In the case that `U` is `void`, then the value of `m` is taken
   to be `true`.
 * If `f` is a function or function object with signature `V f(U)`, and `m` is of type `maybe<U>`, then
@@ -223,7 +223,7 @@ An alternative prefix to "Usage: " can be supplied optionally.
 A parser is a function or functional object with signature `maybe<X> (const char*)`
 for some type `X`. They are used to try to convert a C-string argument into a value.
 
-If no explicit parser is given to the`parse` function or to an `option` specification,
+If no explicit parser is given to the `parse` function or to an `option` specification,
 the default parser `default_parser` is used, which will use `std::istream::operator>>`
 to read the supplied argument.
 
@@ -455,6 +455,8 @@ Option behaviour can be modified by supplying `enum option_flag` values:
 * `mandatory` — Throw an exception if this option does not appear in the command line arguments.
 * `exit` — On successful parsing of this option, stop any further option processing and return `nothing` from `run()`.
 * `stop` — On successful parsing of this option, stop any further option processing but return saved options as normal from `run()`.
+* `lax` — If the argument parsing is unsuccessful or the sink otherwise returns false, disregard this option
+  instead of throwing a `missing_argument` or `option_parse_error` exception.
 
 These enum values are all powers of two and can be combined via bitwise or `|`.
 
@@ -513,6 +515,13 @@ Some example specifications:
         { to::set(b), "-b"_compact, to::flag },
         { to::set(c), "-c"_compact, to::flag }
     };
+
+    // Implementing an option with optional argument with to::lax.
+    // (opt_u must precede opt_u_flag in the sequence of options passed to to::run).
+    maybe<int> u;
+    int default_u = 3;
+    to::option opt_u = { u, "-u", to::lax };
+    to::option opt_u_flag = { to::set(u, default_u), "-u", to::flag };
 ```
 
 #### Saved options
@@ -572,5 +581,49 @@ Like the `to::parse` functions, the `run()` function can throw `missing_argument
 marked with `mandatory` is not found during command line argument parsing.
 
 Note that the arguments in `argv` are checked from the beginning; when calling `run` from within,
-e.g the main function `int main(int argc, char** argv)`, one should pass `argv+1` to `run`
+e.g. the main function `int main(int argc, char** argv)`, one should pass `argv+1` to `run`
 so as to avoid including the program name in `argv[0]`.
+
+### How do I …?
+
+#### How do I make an option that accepts multiple arguments?
+
+Tinyopt does not support this directly but the modal option facility can provide this functionality.
+The following example uses an option `-n` to collect up to five integer values into a vector by switching to a new
+mode and using key-less options to match those integers. (Compare with Example 7.)
+
+```
+    std::vector<std::vector<int>> nss;
+    auto new_ns = [&nss] { nss.push_back({}); };
+    auto push_ns = [&nss](int n) { nss.back().push_back(n); };
+
+    auto gt0 = [](int m) { return m>0; };
+    auto decr = [](int m) { return m-1; };
+
+    to::options opts[] = {
+        { to::action(new_ns), to::flag, "-n", to::then(5) },
+        { to::action(push_ns), to::flag, to::when(gt0), to::then(decr); },
+    };
+```
+
+Here, the `-n` flag pushes a new vector onto `nss` and changes the mode to 5, while the keyless option pushes
+integers onto the vector if the mode is greater than zero and decrements the mode.
+
+#### How do I make an option with an optional argument?
+
+If an option is marked as `lax`, a failure to parse the argument does not throw an exception and `to::run` will then try to match
+other options. This can be used to implement a flag with optional argument:
+
+```
+    maybe<int> value;
+    int default_value = 3;
+
+    to::options opts[] = {
+        { value, "-n", to::lax },
+        { to::set(value, default_value), "-n", to::flag }
+    };
+```
+
+If `argv` has a sequence such as `-n foo`, the first option with key `"-n"` will fail to parse the argument as an integer and
+to::run will then try the next `"-n"` option, which is a flag. `foo` remains in `argv` for further processing. (Compare with Example
+6.)

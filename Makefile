@@ -61,6 +61,9 @@ ex5-run: ex5-run.o
 ex6-run: ex6-run.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
+ex7-run: ex7-run.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
 clean:
 	rm -f $(all-obj)
 
