@@ -5,9 +5,11 @@
 const char* usage_str =
     "[OPTION]...\n"
     "\n"
-    "  -n, --number=N       Specify N\n"
-    "  -f, --function=FUNC  Perform FUNC, which is one of: one, two\n"
-    "  -h, --help           Display usage information and exit\n";
+    "  -n, --number=N       specify number of times to perform function\n"
+    "  -f, --function=FUNC  specify function, which is one of: one, two;\n"
+    "                       this option is mandatory\n"
+    "\n"
+    "  -h, --help           display usage information and exit\n";
 
 int main(int, char** argv) {
     try {

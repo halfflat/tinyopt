@@ -4,10 +4,12 @@
 #include <tinyopt/tinyopt.h>
 
 const char* usage_str =
-    "[-n [ fish | cake ] | -n INT | -n] ...\n"
+    "[OPTIONS]...\n"
     "\n"
-    "Parse and display -n options with either a keyword argument,\n"
-    "an integer argument, or without arguments.\n";
+    "  -n fish | cake     print a message indicating a keyword argument\n"
+    "  -n INT             print a message indicating aninteger argument\n"
+    "  -n                 print a message indicating no argument\n"
+    "  -h, --help         display usage information and exit\n";
 
 void print_kw(const char* kw) {
     std::cout << "keyword argument: " << kw << "\n";
@@ -37,6 +39,7 @@ int main(int argc, char** argv) {
         };
 
         to::run(opts, argc, argv+1);
+        if (argv[1]) throw to::option_error("unrecognized argument", argv[1]);
     }
     catch (to::option_error& e) {
         to::usage_error(argv[0], usage_str, e.what());

@@ -7,8 +7,8 @@
 const char* usage_str =
     "[OPTION]...\n"
     "\n"
-    "  --sum=N1,..,Nk   Sum the integers N1 through Nk.\n"
-    "  -h, --help       Display usage information and exit\n";
+    "  --sum=N1,..,Nk   sum the integers N1 through Nk\n"
+    "  -h, --help       display usage information and exit\n";
 
 int main(int argc, char** argv) {
     try {
