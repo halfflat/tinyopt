@@ -12,6 +12,13 @@ jobs:
                 os: [ ubuntu-22.04 ]
                 cxx: [ g++-10, g++-13, clang++-13, clang++-15 ]
                 cxxstd: [ c++14, c++17, c++20 ]
+                exclude: # exclusions to work around https://github.com/actions/runner-images/issues/8659
+                    - os: "ubuntu-22.04"
+                      cxx: clang++-15
+                      cxxstd: c++20
+                    - os: "ubuntu-22.04"
+                      cxx: clang++-13
+                      cxxstd: c++20
                 include:
                     - os: "macos-latest"
                       cxx: "clang++"
