@@ -7,11 +7,12 @@
 const char* usage_str =
     "[OPTION]... [ARGUMENT]...\n"
     "\n"
-    "  -a, --apple    Print 'apple' but otherwise ignore.\n"
-    "  --             Stop further argument processing.\n"
-    "  -h, --help     Display usage information and exit.\n"
+    "  -a, --apple    print 'apple'\n"
     "\n"
-    "Throw away --apple options and report remaining arguments.\n";
+    "  --             stop further argument processing\n"
+    "  -h, --help     display usage information and exit\n"
+    "\n"
+    "Disregarding --apple options, report remaining arguments.\n";
 
 int main(int argc, char** argv) {
     try {

@@ -3,7 +3,7 @@
 
 top:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-examples:=ex1-parse ex1-run ex2-parse ex2-run ex3-parse ex3-run ex4-run ex5-run
+examples:=ex1-parse ex1-run ex2-parse ex2-run ex3-parse ex3-run ex4-run ex5-run ex6-run ex7-run
 all:: unit $(examples)
 
 test-src:=unit.cc test_sink.cc test_maybe.cc test_option.cc test_state.cc test_parse.cc test_parsers.cc test_saved_options.cc test_run.cc test_version.cc
@@ -56,6 +56,12 @@ ex4-run: ex4-run.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 ex5-run: ex5-run.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+ex6-run: ex6-run.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+ex7-run: ex7-run.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 clean:
